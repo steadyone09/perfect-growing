@@ -15,6 +15,9 @@
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <!-- Tailwind Config for Custom Colors -->
     <script>
         tailwind.config = {
@@ -72,102 +75,108 @@
             GripVertical: () => <svg className="w-5 h-5 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
         };
 
-        // 실제 운영 시 이 부분을 Supabase 클라이언트로 교체합니다.
-        const mockDB = {
-            users: [
-                { id: 'admin-1', email: 'admin@test.com', password: 'password123', role: 'admin' },
-                { id: 'user-1', email: 'user@test.com', password: 'password123', role: 'user' }
-            ],
-            goals: [
-                { id: 'g1', userId: 'user-1', title: '웹 풀스택 마스터하기', category: '학습', deadline: '2026-12-31', milestones: [{id: 'm1', title: 'React 훅 완벽 이해', deadline: '2026-10-15'}] }
-            ],
-            plans: [] // Daily execution plans
-        };
+        // Supabase 초기화 및 연동 변수
+        const SUPABASE_URL = "YOUR_SUPABASE_URL";
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // UUID Generator for mock
-        const generateId = () => Math.random().toString(36).substring(2, 9);
+        // fallback용 ID 생성 함수
+        const generateId = () => window.crypto?.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
 
-        // Simulated API Delay
-        const delay = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms));
-
+        // Supabase 연동 API 객체
         const api = {
             auth: {
                 signIn: async (email, password) => {
-                    await delay();
-                    const user = mockDB.users.find(u => u.email === email && u.password === password);
-                    if (!user) throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
-                    const { password: _, ...safeUser } = user;
-                    return safeUser;
+                    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                    if (error) throw new Error(error.message);
+                    
+                    // metadata에 저장된 role을 가져옵니다 (기본값 'user')
+                    const role = data.user.user_metadata?.role || 'user';
+                    return { id: data.user.id, email: data.user.email, role };
                 },
                 signUp: async (email, password, role = 'user') => {
-                    await delay();
-                    if (mockDB.users.find(u => u.email === email)) throw new Error('이미 존재하는 이메일입니다.');
-                    const newUser = { id: generateId(), email, password, role };
-                    mockDB.users.push(newUser);
-                    const { password: _, ...safeUser } = newUser;
-                    return safeUser;
+                    const { data, error } = await supabase.auth.signUp({ 
+                        email, 
+                        password,
+                        options: { data: { role } } // metadata에 role 저장
+                    });
+                    if (error) throw new Error(error.message);
+                    
+                    return { id: data.user.id, email: data.user.email, role: data.user.user_metadata?.role || 'user' };
                 },
                 resetPasswordForEmail: async (email) => {
-                    await delay();
-                    if (!mockDB.users.find(u => u.email === email)) throw new Error('가입되지 않은 이메일입니다.');
-                    return true; // Mock success
+                    const { error } = await supabase.auth.resetPasswordForEmail(email);
+                    if (error) throw new Error(error.message);
+                    return true;
                 },
                 updateUser: async (userId, newPassword) => {
-                    await delay();
-                    const user = mockDB.users.find(u => u.id === userId);
-                    if (user) user.password = newPassword;
+                    const { error } = await supabase.auth.updateUser({ password: newPassword });
+                    if (error) throw new Error(error.message);
                     return true;
                 },
                 deleteUser: async (userId) => {
-                    await delay();
-                    mockDB.users = mockDB.users.filter(u => u.id !== userId);
-                    mockDB.goals = mockDB.goals.filter(g => g.userId !== userId);
-                    mockDB.plans = mockDB.plans.filter(p => p.userId !== userId);
+                    // 참고: 관리자 권한으로 다른 유저를 삭제하려면 별도의 RPC(Stored Procedure) 또는 Edge Function이 필요합니다.
+                    const { error } = await supabase.rpc('delete_user_by_admin', { target_user_id: userId });
+                    if (error) throw new Error(error.message);
                 }
             },
             data: {
-                getGoals: async (userId) => { await delay(100); return mockDB.goals.filter(g => g.userId === userId); },
+                getGoals: async (userId) => { 
+                    const { data, error } = await supabase.from('goals').select('*').eq('userId', userId);
+                    if (error) throw new Error(error.message);
+                    return data || []; 
+                },
                 saveGoal: async (goal) => {
-                    await delay(100);
-                    if (goal.id) {
-                        const idx = mockDB.goals.findIndex(g => g.id === goal.id);
-                        if (idx > -1) mockDB.goals[idx] = goal;
-                    } else {
-                        goal.id = generateId();
-                        mockDB.goals.push(goal);
-                    }
-                    return goal;
+                    const goalData = { ...goal };
+                    if (!goalData.id) goalData.id = generateId(); // DB에서 uuid를 생성하게 할 수도 있습니다.
+                    
+                    const { data, error } = await supabase.from('goals').upsert(goalData).select().single();
+                    if (error) throw new Error(error.message);
+                    return data || goalData;
                 },
                 deleteGoal: async (goalId) => {
-                    await delay(100);
-                    mockDB.goals = mockDB.goals.filter(g => g.id !== goalId);
+                    const { error } = await supabase.from('goals').delete().eq('id', goalId);
+                    if (error) throw new Error(error.message);
                 },
-                getPlans: async (userId) => { await delay(100); return mockDB.plans.filter(p => p.userId === userId); },
+                getPlans: async (userId) => { 
+                    const { data, error } = await supabase.from('plans').select('*').eq('userId', userId);
+                    if (error) throw new Error(error.message);
+                    return data || []; 
+                },
                 savePlan: async (plan) => {
-                    await delay(100);
-                    if (plan.id) {
-                        const idx = mockDB.plans.findIndex(p => p.id === plan.id);
-                        if (idx > -1) mockDB.plans[idx] = plan;
-                    } else {
-                        plan.id = generateId();
-                        mockDB.plans.push(plan);
-                    }
-                    return plan;
+                    const planData = { ...plan };
+                    if (!planData.id) planData.id = generateId();
+
+                    const { data, error } = await supabase.from('plans').upsert(planData).select().single();
+                    if (error) throw new Error(error.message);
+                    return data || planData;
                 },
                 deletePlan: async (planId) => {
-                    await delay(100);
-                    mockDB.plans = mockDB.plans.filter(p => p.id !== planId);
+                    const { error } = await supabase.from('plans').delete().eq('id', planId);
+                    if (error) throw new Error(error.message);
                 }
             },
             admin: {
-                getAllUsers: async () => { await delay(); return mockDB.users.map(({password, ...u}) => u); },
+                getAllUsers: async () => { 
+                    // 관리자가 모든 유저를 조회하려면 public.profiles 뷰/테이블이 존재해야 합니다.
+                    const { data, error } = await supabase.from('profiles').select('*');
+                    if (error) throw new Error(error.message);
+                    return data || []; 
+                },
                 getGlobalStats: async () => {
-                    await delay();
+                    // Supabase의 exact count 기능 활용
+                    const [usersReq, goalsReq, plansReq, completedReq] = await Promise.all([
+                        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+                        supabase.from('goals').select('*', { count: 'exact', head: true }),
+                        supabase.from('plans').select('*', { count: 'exact', head: true }),
+                        supabase.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'completed')
+                    ]);
+                    
                     return {
-                        totalUsers: mockDB.users.length,
-                        totalGoals: mockDB.goals.length,
-                        totalPlans: mockDB.plans.length,
-                        completedPlans: mockDB.plans.filter(p => p.completed).length
+                        totalUsers: usersReq.count || 0,
+                        totalGoals: goalsReq.count || 0,
+                        totalPlans: plansReq.count || 0,
+                        completedPlans: completedReq.count || 0
                     }
                 }
             }
