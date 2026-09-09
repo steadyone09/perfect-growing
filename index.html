@@ -24,8 +24,8 @@
     // ==========================================
     // 0. Supabase 연동 설정 & 지연 함수
     // ==========================================
-    const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co"; // TODO: 실제 URL로 변경
-    const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD";     // TODO: 실제 Anon Key로 변경
+    const SUPABASE_URL = "https://your-project.supabase.co"; // TODO: 실제 URL로 변경
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";     // TODO: 실제 Anon Key로 변경
 
     let supabase;
     try {
@@ -38,16 +38,35 @@
 
     // Lucide 아이콘 React 래퍼 컴포넌트
     const Icon = ({ name, size = 20, className = "" }) => {
-      const [svgContent, setSvgContent] = React.useState('');
+      const spanRef = React.useRef(null);
+
       React.useEffect(() => {
-        if (window.lucide && window.lucide.icons && window.lucide.icons[name]) {
-          const icon = window.lucide.icons[name];
-          const svg = icon.toSvg({ size, class: className });
-          setSvgContent(svg);
+        if (spanRef.current && window.lucide && window.lucide.icons && window.lucide.icons[name]) {
+          // 기존에 렌더링된 아이콘 초기화
+          spanRef.current.innerHTML = ''; 
+          
+          try {
+            const iconData = window.lucide.icons[name];
+            
+            // 1. 최신 Lucide 버전 대응 (createElement 사용)
+            if (typeof window.lucide.createElement === 'function') {
+              const svgElement = window.lucide.createElement(iconData);
+              svgElement.setAttribute('width', size);
+              svgElement.setAttribute('height', size);
+              if (className) svgElement.setAttribute('class', className);
+              spanRef.current.appendChild(svgElement);
+            } 
+            // 2. 구버전 Lucide 대응 폴백 (toSvg 사용)
+            else if (typeof iconData.toSvg === 'function') {
+              spanRef.current.innerHTML = iconData.toSvg({ width: size, height: size, class: className });
+            }
+          } catch (e) {
+            console.warn("아이콘 렌더링 중 에러 발생:", e);
+          }
         }
       }, [name, size, className]);
 
-      return <span dangerouslySetInnerHTML={{ __html: svgContent }} className="inline-flex items-center justify-center" />;
+      return <span ref={spanRef} className="inline-flex items-center justify-center" />;
     };
 
     // 시간 변환 헬퍼 (분 -> 시간/분 표현)
