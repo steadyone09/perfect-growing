@@ -321,7 +321,7 @@
                                 <div className="flex items-start gap-2 mt-4">
                                     <input type="checkbox" id="terms" checked={agreed} onChange={e=>setAgreed(e.target.checked)} className="mt-1" />
                                     <label htmlFor="terms" className="text-sm text-gray-600">
-                                        [필수] 개인정보 수집 및 데이터 처리에 동의합니다.
+                                        [필수] 개인정보 수집(이메일) 및 데이터 처리에 동의합니다.
                                     </label>
                                 </div>
                             )}
@@ -421,7 +421,7 @@
                                             <Icons.Calendar /> {goal.deadline || '기한 없음'}
                                         </div>
                                         <div className="border-t pt-3 flex justify-between items-center text-sm">
-                                            <span className="text-gray-500">마일스톤 {goal.milestones?.length || 0}개</span>
+                                            <span className="text-gray-500">중간단계 {goal.milestones?.length || 0}개</span>
                                             {isAdminView && <span className="text-primary font-medium text-xs">조회 전용</span>}
                                         </div>
                                     </div>
@@ -538,14 +538,14 @@
 
                         <div className="space-y-3">
                             <div className="flex justify-between items-center border-b pb-2">
-                                <h4 className="font-semibold text-gray-700">중간 단계 (마일스톤)</h4>
+                                <h4 className="font-semibold text-gray-700">중간 단계 (중간단계)</h4>
                                 <button type="button" onClick={addMilestone} className="text-sm text-primary flex items-center gap-1 hover:underline">
                                     <Icons.Plus /> 추가
                                 </button>
                             </div>
                             
                             {safeMilestones.length === 0 && (
-                                <p className="text-sm text-gray-500 text-center py-2">등록된 마일스톤이 없습니다.</p>
+                                <p className="text-sm text-gray-500 text-center py-2">등록된 중간단계가 없습니다.</p>
                             )}
                             
                             <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
@@ -644,7 +644,7 @@
                         </select>
                         {selectedGoal && selectedGoal.milestones?.length > 0 && (
                             <select className="w-full border rounded-lg p-2" value={selectedMilestoneId} onChange={e=>setSelectedMilestoneId(e.target.value)}>
-                                <option value="">관련 마일스톤 (선택)</option>
+                                <option value="">관련 중간단계 (선택)</option>
                                 {selectedGoal.milestones.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
                             </select>
                         )}
@@ -692,7 +692,7 @@
                                 </select>
                                 {selectedGoal && selectedGoal.milestones?.length > 0 && (
                                     <div className="mb-4 animate-[slideUp_0.2s_ease-out]">
-                                        <p className="text-sm font-medium text-gray-600 mb-2">연관된 마일스톤이 있다면 선택해주세요</p>
+                                        <p className="text-sm font-medium text-gray-600 mb-2">연관된 중간단계가 있다면 선택해주세요</p>
                                         <select className="w-full border-2 border-gray-200 rounded-xl p-3" value={selectedMilestoneId} onChange={e=>setSelectedMilestoneId(e.target.value)}>
                                             <option value="">선택 안함</option>
                                             {selectedGoal.milestones.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
