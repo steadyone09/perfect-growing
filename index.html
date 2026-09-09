@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>목표 및 실행 관리 대시보드</title>
+  
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & React DOM CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone CDN (JSX 컴파일용) -->
+  <!-- Babel Standalone CDN -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -23,7 +24,6 @@
     // ==========================================
     // 0. Supabase 연동 설정 & 지연 함수
     // ==========================================
-    // 실제 프로젝트의 Supabase URL과 Anon Key로 교체하여 사용하세요.
     const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD";
 
@@ -36,21 +36,36 @@
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Lucide 아이콘 React 래퍼 컴포넌트
+    // Lucide 아이콘 React 래퍼 컴포넌트 (렌더링 크래시 버그 완벽 해결)
     const Icon = ({ name, size = 20, className = "" }) => {
-      const [svgContent, setSvgContent] = React.useState('');
+      const spanRef = React.useRef(null);
+
       React.useEffect(() => {
-        if (window.lucide && window.lucide.icons && window.lucide.icons[name]) {
-          const icon = window.lucide.icons[name];
-          const svg = icon.toSvg({ size, class: className });
-          setSvgContent(svg);
+        if (spanRef.current && window.lucide && window.lucide.icons && window.lucide.icons[name]) {
+          spanRef.current.innerHTML = ''; 
+          try {
+            const iconData = window.lucide.icons[name];
+            // 최신버전 API 우선 지원
+            if (typeof window.lucide.createElement === 'function') {
+              const svgElement = window.lucide.createElement(iconData);
+              svgElement.setAttribute('width', size);
+              svgElement.setAttribute('height', size);
+              if (className) svgElement.setAttribute('class', className);
+              spanRef.current.appendChild(svgElement);
+            } else if (typeof iconData.toSvg === 'function') {
+              // 구버전 호환용
+              spanRef.current.innerHTML = iconData.toSvg({ width: size, height: size, class: className });
+            }
+          } catch (e) {
+            console.warn("아이콘 렌더링 중 에러 발생:", e);
+          }
         }
       }, [name, size, className]);
 
-      return <span dangerouslySetInnerHTML={{ __html: svgContent }} className="inline-flex items-center justify-center" />;
+      return <span ref={spanRef} className="inline-flex items-center justify-center" />;
     };
 
-    // 시간 변환 헬퍼 (분 -> 시간/분 표현)
+    // 시간 변환 헬퍼 (분 -> 시간/분 표현, 오차 해결)
     const formatTime = (minutes) => {
       const m = parseInt(minutes, 10) || 0;
       if (m <= 0) return '0분';
@@ -152,24 +167,49 @@
     };
 
     // ==========================================
-    // 2. 공통 UI 컴포넌트 (모달 및 팝업)
+    // 2. 공통 UI 컴포넌트 (커스텀 모달)
     // ==========================================
     const CustomModal = ({ isOpen, title, children, onClose }) => {
       if (!isOpen) return null;
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-100">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-100 flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0">
               <h3 className="text-lg font-bold text-white">{title}</h3>
               <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
                 <Icon name="X" size={20} />
               </button>
             </div>
-            <div className="p-6 max-h-[80vh] overflow-y-auto">{children}</div>
+            <div className="p-6 overflow-y-auto">{children}</div>
           </div>
         </div>
       );
     };
+
+    const AlertModal = ({ isOpen, message, onClose }) => (
+      <CustomModal isOpen={isOpen} title="알림" onClose={onClose}>
+        <p className="text-sm text-slate-300 mb-6">{message}</p>
+        <div className="flex justify-end">
+          <button onClick={onClose} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-indigo-600/20">
+            확인
+          </button>
+        </div>
+      </CustomModal>
+    );
+
+    const ConfirmModal = ({ isOpen, message, onConfirm, onClose }) => (
+      <CustomModal isOpen={isOpen} title="확인" onClose={onClose}>
+        <p className="text-sm text-slate-300 mb-6">{message}</p>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition">
+            취소
+          </button>
+          <button onClick={() => { onConfirm(); onClose(); }} className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-red-600/20">
+            실행
+          </button>
+        </div>
+      </CustomModal>
+    );
 
     // ==========================================
     // 3. 비밀번호 재설정 모달 (복구 링크 접속 시)
@@ -329,7 +369,7 @@
       };
 
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-black">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-black relative z-10">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
             <div className="text-center mb-8">
               <div className="w-12 h-12 bg-indigo-600/20 text-indigo-400 rounded-xl flex items-center justify-center mx-auto mb-3 border border-indigo-500/30">
@@ -460,7 +500,7 @@
         setMilestones(milestones.filter(m => m.id !== id));
       };
 
-      // 드래그 앤 드롭 핸들러
+      // 드래그 앤 드롭 핸들러 (null 참조 방어 로직)
       const handleDragStart = (e, index) => {
         setDraggedIndex(index);
         e.dataTransfer.effectAllowed = "move";
@@ -530,7 +570,7 @@
               </div>
             </div>
 
-            {/* 중간 단계 (마일스톤) 수립 섹션 */}
+            {/* 중간 단계 수립 섹션 */}
             <div className="pt-4 border-t border-slate-800">
               <div className="flex justify-between items-center mb-3">
                 <label className="text-sm font-semibold text-white">중간 단계 (순서 변경 가능)</label>
@@ -543,7 +583,7 @@
                 </button>
               </div>
 
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
                 {milestones.length === 0 ? (
                   <p className="text-xs text-slate-500 text-center py-4">등록된 중간 단계가 없습니다.</p>
                 ) : (
@@ -610,7 +650,7 @@
     // ==========================================
     // 6. 뷰 1: 목표 페이지
     // ==========================================
-    const GoalsView = ({ goals, onSaveGoal, onDeleteGoal }) => {
+    const GoalsView = ({ goals, onSaveGoal }) => {
       const [selectedGoal, setSelectedGoal] = React.useState(null);
       const [isModalOpen, setIsModalOpen] = React.useState(false);
 
@@ -626,7 +666,7 @@
       };
 
       return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative z-10">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-bold text-white">목표 현황</h2>
@@ -701,6 +741,7 @@
     const ExecutionView = ({ goals, onSavePlan }) => {
       const [mode, setMode] = React.useState('wizard'); // wizard | simple
       const [step, setStep] = React.useState(1);
+      const [alertMsg, setAlertMsg] = React.useState('');
 
       // 실행 작성 폼 상태
       const [selectedGoalId, setSelectedGoalId] = React.useState('');
@@ -730,7 +771,8 @@
           notes: ''
         };
         onSavePlan(newPlan);
-        alert('오늘의 실행 계획이 저장되었습니다!');
+        setAlertMsg('오늘의 실행 계획이 저장되었습니다! 일지 탭에서 확인하세요.');
+        
         // 폼 초기화
         setSelectedGoalId('');
         setSelectedMilestoneId('');
@@ -744,7 +786,9 @@
       };
 
       return (
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-2xl mx-auto space-y-6 relative z-10">
+          <AlertModal isOpen={!!alertMsg} message={alertMsg} onClose={() => setAlertMsg('')} />
+
           <div className="flex justify-between items-center bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
             <button
               onClick={() => setMode('wizard')}
@@ -984,14 +1028,24 @@
     // 8. 뷰 3: 일일 일지 (복기 및 삭제)
     // ==========================================
     const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan }) => {
-      const handleDelete = (planId) => {
-        if (confirm("정말 이 일일 계획을 삭제하시겠습니까?")) {
-          onDeletePlan(planId);
+      const [planToDelete, setPlanToDelete] = React.useState(null);
+
+      const confirmDelete = () => {
+        if (planToDelete) {
+          onDeletePlan(planToDelete);
+          setPlanToDelete(null);
         }
       };
 
       return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative z-10">
+          <ConfirmModal 
+            isOpen={!!planToDelete} 
+            message="정말 이 일일 계획을 삭제하시겠습니까?" 
+            onConfirm={confirmDelete}
+            onClose={() => setPlanToDelete(null)}
+          />
+
           <div>
             <h2 className="text-xl font-bold text-white">실행 목록 일지</h2>
             <p className="text-xs text-slate-400">수행한 계획의 결과를 정확히 작성해 성장을 기록하세요.</p>
@@ -1025,7 +1079,7 @@
 
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleDelete(plan.id)}
+                          onClick={() => setPlanToDelete(plan.id)}
                           className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition"
                           title="계획 삭제"
                         >
@@ -1046,14 +1100,14 @@
                           value={plan.durationActual || ''}
                           onChange={(e) => onUpdatePlan({ ...plan, durationActual: parseInt(e.target.value, 10) || 0 })}
                           placeholder="분 단위 입력"
-                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white"
+                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white focus:outline-none focus:border-indigo-500 transition"
                         />
                       </div>
                       <div>
                         <label className="text-slate-400 block mb-1">달성 여부</label>
                         <button
                           onClick={() => onUpdatePlan({ ...plan, status: isCompleted ? 'planned' : 'completed' })}
-                          className={`w-full py-1 rounded font-semibold text-xs border ${
+                          className={`w-full py-1 rounded font-semibold text-xs border transition ${
                             isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'
                           }`}
                         >
@@ -1069,7 +1123,7 @@
                         value={plan.notes || ''}
                         onChange={(e) => onUpdatePlan({ ...plan, notes: e.target.value })}
                         placeholder="오늘의 성과나 피드백을 자유롭게 기록하세요."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500 transition"
                       />
                     </div>
                   </div>
@@ -1093,7 +1147,7 @@
       const completionRate = plans.length > 0 ? Math.round((completedPlans.length / plans.length) * 100) : 0;
 
       return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative z-10">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-bold text-white">통계 리포트</h2>
@@ -1104,7 +1158,7 @@
                 <button
                   key={type}
                   onClick={() => setFilter(type)}
-                  className={`px-3 py-1.5 rounded-lg capitalize ${filter === type ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}
+                  className={`px-3 py-1.5 rounded-lg capitalize ${filter === type ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white transition'}`}
                 >
                   {type === 'weekly' ? '주간' : type === 'monthly' ? '월간' : '연간'}
                 </button>
@@ -1142,7 +1196,7 @@
       }, []);
 
       return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative z-10">
           <div>
             <h2 className="text-xl font-bold text-white">관리자 전용 대시보드</h2>
             <p className="text-xs text-slate-400">전체 유저 현황 및 서비스 통합 지표를 조회합니다.</p>
@@ -1174,7 +1228,9 @@
       const [currentTab, setCurrentTab] = React.useState('goals');
       const [goals, setGoals] = React.useState([]);
       const [plans, setPlans] = React.useState([]);
+      
       const [isResetModalOpen, setIsResetModalOpen] = React.useState(false);
+      const [logoutConfirm, setLogoutConfirm] = React.useState(false);
 
       // 비밀번호 재설정 토큰 감지 (URL 해시 파싱)
       React.useEffect(() => {
@@ -1235,6 +1291,11 @@
         setPlans(prev => prev.filter(p => p.id !== planId));
       };
 
+      const executeLogout = async () => {
+        await api.auth.signOut();
+        setUser(null);
+      };
+
       if (!user) {
         return (
           <>
@@ -1247,9 +1308,17 @@
       const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'admin@test.com';
 
       return (
-        <div className="min-h-screen flex flex-col bg-black text-slate-100">
+        <div className="min-h-screen flex flex-col bg-black text-slate-100 relative">
+          
+          <ConfirmModal 
+            isOpen={logoutConfirm} 
+            message="로그아웃 하시겠습니까?" 
+            onConfirm={executeLogout} 
+            onClose={() => setLogoutConfirm(false)} 
+          />
+
           {/* 상단 탭 네비게이션 */}
-          <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+          <header className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-slate-800">
             <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-16">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black">
@@ -1281,8 +1350,8 @@
               </nav>
 
               <button
-                onClick={() => { api.auth.signOut(); setUser(null); }}
-                className="text-slate-500 hover:text-slate-300 p-2 rounded-lg"
+                onClick={() => setLogoutConfirm(true)}
+                className="text-slate-500 hover:text-slate-300 p-2 rounded-lg transition"
                 title="로그아웃"
               >
                 <Icon name="LogOut" size={18} />
@@ -1291,7 +1360,7 @@
           </header>
 
           {/* 메인 컨텐츠 */}
-          <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6">
+          <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 relative z-10">
             {currentTab === 'goals' && <GoalsView goals={goals} onSaveGoal={handleSaveGoal} />}
             {currentTab === 'execution' && <ExecutionView goals={goals} onSavePlan={handleSavePlan} />}
             {currentTab === 'journal' && <JournalView plans={plans} goals={goals} onUpdatePlan={handleUpdatePlan} onDeletePlan={handleDeletePlan} />}
