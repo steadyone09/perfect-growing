@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>목표 및 실행 관리 대시보드</title>
+  
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & React DOM CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone CDN (JSX 컴파일용) -->
+  <!-- Babel Standalone CDN -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -23,9 +24,8 @@
     // ==========================================
     // 0. Supabase 연동 설정 & 지연 함수
     // ==========================================
-    // 실제 프로젝트의 Supabase URL과 Anon Key로 교체하여 사용하세요.
-    const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD";
+    const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co"; // TODO: 실제 URL로 변경
+    const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD";     // TODO: 실제 Anon Key로 변경
 
     let supabase;
     try {
@@ -67,7 +67,7 @@
     const api = {
       auth: {
         signUp: async (email, password) => {
-          if (!supabase) return { error: null };
+          if (!supabase) return { error: { message: "Supabase 설정이 필요합니다." } };
           return await supabase.auth.signUp({
             email,
             password,
@@ -75,7 +75,7 @@
           });
         },
         signIn: async (email, password) => {
-          if (!supabase) return { data: { user: { id: 'test-user', email, user_metadata: { role: 'user' } } }, error: null };
+          if (!supabase) return { error: { message: "Supabase 설정이 필요합니다." } };
           return await supabase.auth.signInWithPassword({ email, password });
         },
         signOut: async () => {
@@ -83,13 +83,13 @@
           return await supabase.auth.signOut();
         },
         resetPassword: async (email) => {
-          if (!supabase) return { error: null };
+          if (!supabase) return { error: { message: "Supabase 설정이 필요합니다." } };
           return await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin
           });
         },
         updatePassword: async (newPassword) => {
-          if (!supabase) return { error: null };
+          if (!supabase) return { error: { message: "Supabase 설정이 필요합니다." } };
           return await supabase.auth.updateUser({ password: newPassword });
         },
         getUser: async () => {
@@ -152,24 +152,49 @@
     };
 
     // ==========================================
-    // 2. 공통 UI 컴포넌트 (모달 및 팝업)
+    // 2. 공통 UI 컴포넌트 (커스텀 모달)
     // ==========================================
     const CustomModal = ({ isOpen, title, children, onClose }) => {
       if (!isOpen) return null;
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-100">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-100 flex flex-col max-h-full">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0">
               <h3 className="text-lg font-bold text-white">{title}</h3>
               <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
                 <Icon name="X" size={20} />
               </button>
             </div>
-            <div className="p-6 max-h-[80vh] overflow-y-auto">{children}</div>
+            <div className="p-6 overflow-y-auto">{children}</div>
           </div>
         </div>
       );
     };
+
+    const AlertModal = ({ isOpen, message, onClose }) => (
+      <CustomModal isOpen={isOpen} title="알림" onClose={onClose}>
+        <p className="text-sm text-slate-300 mb-6">{message}</p>
+        <div className="flex justify-end">
+          <button onClick={onClose} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-indigo-600/20">
+            확인
+          </button>
+        </div>
+      </CustomModal>
+    );
+
+    const ConfirmModal = ({ isOpen, message, onConfirm, onClose }) => (
+      <CustomModal isOpen={isOpen} title="확인" onClose={onClose}>
+        <p className="text-sm text-slate-300 mb-6">{message}</p>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition">
+            취소
+          </button>
+          <button onClick={() => { onConfirm(); onClose(); }} className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-red-600/20">
+            실행
+          </button>
+        </div>
+      </CustomModal>
+    );
 
     // ==========================================
     // 3. 비밀번호 재설정 모달 (복구 링크 접속 시)
@@ -336,7 +361,7 @@
                 <Icon name="Target" size={28} />
               </div>
               <h1 className="text-2xl font-bold text-white">목표 실행 대시보드</h1>
-              <p className="text-sm text-slate-400 mt-1">체계적인 목표 수립과 실행 서비스</p>
+              <p className="text-sm text-slate-400 mt-1">체계적인 목표 수립과 일일 복기 서비스</p>
             </div>
 
             {message.text && (
@@ -460,7 +485,6 @@
         setMilestones(milestones.filter(m => m.id !== id));
       };
 
-      // 드래그 앤 드롭 핸들러
       const handleDragStart = (e, index) => {
         setDraggedIndex(index);
         e.dataTransfer.effectAllowed = "move";
@@ -530,7 +554,6 @@
               </div>
             </div>
 
-            {/* 중간 단계 (마일스톤) 수립 섹션 */}
             <div className="pt-4 border-t border-slate-800">
               <div className="flex justify-between items-center mb-3">
                 <label className="text-sm font-semibold text-white">중간 단계 (순서 변경 가능)</label>
@@ -543,7 +566,7 @@
                 </button>
               </div>
 
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
                 {milestones.length === 0 ? (
                   <p className="text-xs text-slate-500 text-center py-4">등록된 중간 단계가 없습니다.</p>
                 ) : (
@@ -610,7 +633,7 @@
     // ==========================================
     // 6. 뷰 1: 목표 페이지
     // ==========================================
-    const GoalsView = ({ goals, onSaveGoal, onDeleteGoal }) => {
+    const GoalsView = ({ goals, onSaveGoal }) => {
       const [selectedGoal, setSelectedGoal] = React.useState(null);
       const [isModalOpen, setIsModalOpen] = React.useState(false);
 
@@ -701,6 +724,7 @@
     const ExecutionView = ({ goals, onSavePlan }) => {
       const [mode, setMode] = React.useState('wizard'); // wizard | simple
       const [step, setStep] = React.useState(1);
+      const [alertMsg, setAlertMsg] = React.useState('');
 
       // 실행 작성 폼 상태
       const [selectedGoalId, setSelectedGoalId] = React.useState('');
@@ -730,7 +754,10 @@
           notes: ''
         };
         onSavePlan(newPlan);
-        alert('오늘의 실행 계획이 저장되었습니다!');
+        
+        // 브라우저 alert 대체
+        setAlertMsg('오늘의 실행 계획이 저장되었습니다! 일지 탭에서 확인하세요.');
+
         // 폼 초기화
         setSelectedGoalId('');
         setSelectedMilestoneId('');
@@ -745,6 +772,8 @@
 
       return (
         <div className="max-w-2xl mx-auto space-y-6">
+          <AlertModal isOpen={!!alertMsg} message={alertMsg} onClose={() => setAlertMsg('')} />
+
           <div className="flex justify-between items-center bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
             <button
               onClick={() => setMode('wizard')}
@@ -984,16 +1013,26 @@
     // 8. 뷰 3: 일일 일지 (복기 및 삭제)
     // ==========================================
     const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan }) => {
-      const handleDelete = (planId) => {
-        if (confirm("정말 이 일일 계획을 삭제하시겠습니까?")) {
-          onDeletePlan(planId);
+      const [planToDelete, setPlanToDelete] = React.useState(null);
+
+      const confirmDelete = () => {
+        if (planToDelete) {
+          onDeletePlan(planToDelete);
+          setPlanToDelete(null);
         }
       };
 
       return (
         <div className="space-y-6">
+          <ConfirmModal 
+            isOpen={!!planToDelete} 
+            message="정말 이 일일 계획을 삭제하시겠습니까?" 
+            onConfirm={confirmDelete}
+            onClose={() => setPlanToDelete(null)}
+          />
+
           <div>
-            <h2 className="text-xl font-bold text-white">실행 목록 일지</h2>
+            <h2 className="text-xl font-bold text-white">일일 복기 일지</h2>
             <p className="text-xs text-slate-400">수행한 계획의 결과를 정확히 작성해 성장을 기록하세요.</p>
           </div>
 
@@ -1025,7 +1064,7 @@
 
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleDelete(plan.id)}
+                          onClick={() => setPlanToDelete(plan.id)}
                           className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition"
                           title="계획 삭제"
                         >
@@ -1174,7 +1213,10 @@
       const [currentTab, setCurrentTab] = React.useState('goals');
       const [goals, setGoals] = React.useState([]);
       const [plans, setPlans] = React.useState([]);
+      
+      // 모달 상태 관리
       const [isResetModalOpen, setIsResetModalOpen] = React.useState(false);
+      const [logoutConfirm, setLogoutConfirm] = React.useState(false);
 
       // 비밀번호 재설정 토큰 감지 (URL 해시 파싱)
       React.useEffect(() => {
@@ -1185,7 +1227,7 @@
           }
         };
 
-        handleHashChange();
+        handleHashChange(); // 초기 마운트 시 확인
         window.addEventListener('hashchange', handleHashChange);
         return () => window.removeEventListener('hashchange', handleHashChange);
       }, []);
@@ -1235,10 +1277,17 @@
         setPlans(prev => prev.filter(p => p.id !== planId));
       };
 
+      const executeLogout = async () => {
+        await api.auth.signOut();
+        setUser(null);
+      };
+
+      // 로그인하지 않은 상태일 때 Auth 화면 표시
       if (!user) {
         return (
           <>
             <AuthView onLoginSuccess={(u) => { setUser(u); loadUserData(u.id); }} />
+            {/* 로그인 전에도 URL 타고 들어왔으면 리셋 모달이 보여야 함 */}
             <ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} />
           </>
         );
@@ -1248,6 +1297,13 @@
 
       return (
         <div className="min-h-screen flex flex-col bg-black text-slate-100">
+          <ConfirmModal 
+            isOpen={logoutConfirm} 
+            message="로그아웃 하시겠습니까?" 
+            onConfirm={executeLogout} 
+            onClose={() => setLogoutConfirm(false)} 
+          />
+
           {/* 상단 탭 네비게이션 */}
           <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
             <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-16">
@@ -1258,7 +1314,7 @@
                 <span className="font-bold text-white text-sm hidden sm:inline">GOAL DASHBOARD</span>
               </div>
 
-              {/* 탭 버튼들 */}
+              {/* 탭 메뉴 */}
               <nav className="flex space-x-1 sm:space-x-2">
                 {[
                   { id: 'goals', label: '목표', icon: 'Target' },
@@ -1281,8 +1337,8 @@
               </nav>
 
               <button
-                onClick={() => { api.auth.signOut(); setUser(null); }}
-                className="text-slate-500 hover:text-slate-300 p-2 rounded-lg"
+                onClick={() => setLogoutConfirm(true)}
+                className="text-slate-500 hover:text-slate-300 p-2 rounded-lg transition"
                 title="로그아웃"
               >
                 <Icon name="LogOut" size={18} />
@@ -1290,7 +1346,7 @@
             </div>
           </header>
 
-          {/* 메인 컨텐츠 */}
+          {/* 메인 컨텐츠 영역 */}
           <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6">
             {currentTab === 'goals' && <GoalsView goals={goals} onSaveGoal={handleSaveGoal} />}
             {currentTab === 'execution' && <ExecutionView goals={goals} onSavePlan={handleSavePlan} />}
@@ -1299,7 +1355,7 @@
             {currentTab === 'admin' && isAdmin && <AdminView />}
           </main>
 
-          {/* 비밀번호 재설정 모달 */}
+          {/* 로그인 상태에서도 리셋 모달 노출 가능하게 유지 */}
           <ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} />
         </div>
       );
