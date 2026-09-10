@@ -4,13 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>최강 목표 - 대시보드</title>
-  
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & React DOM CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone CDN -->
+  <!-- Babel Standalone CDN (JSX 컴파일용) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -24,6 +23,7 @@
     // ==========================================
     // 0. Supabase 연동 설정 & 지연 함수
     // ==========================================
+    // 실제 프로젝트의 Supabase URL과 Anon Key로 교체하여 사용하세요.
     const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD";
 
@@ -63,7 +63,7 @@
       return <span ref={spanRef} className="inline-flex items-center justify-center" />;
     };
 
-    // 시간 변환 헬퍼 (분 -> 시간/분 표현)
+    // 시간 변환 헬퍼 (분 -> 시간/분 표현, 오차 해결 완벽 적용)
     const formatTime = (minutes) => {
       const m = parseInt(minutes, 10) || 0;
       if (m <= 0) return '0분';
@@ -165,12 +165,12 @@
     };
 
     // ==========================================
-    // 2. 공통 UI 컴포넌트 (커스텀 모달)
+    // 2. 공통 UI 컴포넌트 (모달 및 팝업)
     // ==========================================
     const CustomModal = ({ isOpen, title, children, onClose }) => {
       if (!isOpen) return null;
       return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-100 flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0">
               <h3 className="text-lg font-bold text-white">{title}</h3>
@@ -210,7 +210,7 @@
     );
 
     // ==========================================
-    // 3. 비밀번호 재설정 모달
+    // 3. 비밀번호 재설정 모달 (복구 링크 접속 시)
     // ==========================================
     const ResetPasswordModal = ({ isOpen, onClose }) => {
       const [newPassword, setNewPassword] = React.useState('');
@@ -244,7 +244,7 @@
         } else {
           setSuccessMsg('비밀번호가 성공적으로 변경되었습니다!');
           setTimeout(() => {
-            window.location.hash = ''; 
+            window.location.hash = ''; // 해시 제거
             onClose();
           }, 1500);
         }
@@ -498,6 +498,7 @@
         setMilestones(milestones.filter(m => m.id !== id));
       };
 
+      // 드래그 앤 드롭 핸들러
       const handleDragStart = (e, index) => {
         setDraggedIndex(index);
         e.dataTransfer.effectAllowed = "move";
@@ -733,17 +734,18 @@
     };
 
     // ==========================================
-    // 7. 뷰 2: 계획 페이지 (기존 '실행 페이지')
+    // 7. 뷰 2: 계획 페이지 (대화형 대시보드) + 캘린더 연동 필드
     // ==========================================
     const ExecutionView = ({ goals, onSavePlan }) => {
       const [mode, setMode] = React.useState('wizard'); // wizard | simple
       const [step, setStep] = React.useState(1);
       const [alertMsg, setAlertMsg] = React.useState('');
 
+      // 실행 작성 폼 상태
       const [selectedGoalId, setSelectedGoalId] = React.useState('');
       const [selectedMilestoneId, setSelectedMilestoneId] = React.useState('');
       const [actionText, setActionText] = React.useState('');
-      const [timeText, setTimeText] = React.useState('');
+      const [timeText, setTimeText] = React.useState(''); // type="time" (HH:mm)
       const [durationPlanned, setDurationPlanned] = React.useState(30);
       const [hasBlocker, setHasBlocker] = React.useState(false);
       const [blockerText, setBlockerText] = React.useState('');
@@ -769,6 +771,7 @@
         onSavePlan(newPlan);
         setAlertMsg('오늘의 계획이 저장되었습니다! 실행 탭에서 확인하세요.');
         
+        // 폼 초기화
         setSelectedGoalId('');
         setSelectedMilestoneId('');
         setActionText('');
@@ -867,12 +870,13 @@
                   <span className="text-xs font-bold text-orange-400">Q3. 시간 수립</span>
                   <h3 className="text-lg font-bold text-white">오늘 중에 언제, 얼마나 하시겠어요?</h3>
                   <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">시점 (예: 퇴근 후 오후 8시)</label>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간</label>
                     <input
-                      type="text"
+                      type="time"
                       value={timeText}
                       onChange={(e) => setTimeText(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm color-scheme-dark"
+                      style={{ colorScheme: 'dark' }}
                     />
                   </div>
                   <div>
@@ -944,7 +948,7 @@
                   <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
                     <p><span className="text-slate-400">목표:</span> <strong className="text-white">{activeGoal?.title}</strong></p>
                     <p><span className="text-slate-400">실행 행동:</span> <strong className="text-white">{actionText}</strong></p>
-                    <p><span className="text-slate-400">수행 시점 및 시간:</span> <strong className="text-white">{timeText} ({formatTime(durationPlanned)})</strong></p>
+                    <p><span className="text-slate-400">수행 예정 시점:</span> <strong className="text-white">{timeText || '미정'} ({formatTime(durationPlanned)})</strong></p>
                     {hasBlocker && <p><span className="text-slate-400">장애요인 대처:</span> <strong className="text-white">{solutionText}</strong></p>}
                   </div>
 
@@ -986,13 +990,13 @@
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">수행 시점</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간</label>
                   <input
-                    type="text"
+                    type="time"
                     value={timeText}
                     onChange={(e) => setTimeText(e.target.value)}
-                    placeholder="오후 8시"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm"
+                    style={{ colorScheme: 'dark' }}
                   />
                 </div>
                 <div>
@@ -1020,7 +1024,7 @@
     };
 
     // ==========================================
-    // 8. 뷰 3: 실행 페이지 (기존 '일일 일지')
+    // 8. 뷰 3: 실행 페이지 (일일 일지 + 캘린더 다운로드)
     // ==========================================
     const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan }) => {
       const [planToDelete, setPlanToDelete] = React.useState(null);
@@ -1029,6 +1033,65 @@
         if (planToDelete) {
           onDeletePlan(planToDelete);
           setPlanToDelete(null);
+        }
+      };
+
+      // 캘린더 알림(.ics) 생성 로직
+      const handleDownloadICS = (plan, goal) => {
+        try {
+          const dateStr = plan.date || new Date().toISOString().split('T')[0];
+          const timeStr = plan.timeText || "12:00";
+          
+          const startDate = new Date(`${dateStr}T${timeStr}:00`);
+          const duration = parseInt(plan.durationPlanned, 10) || 30;
+          const endDate = new Date(startDate.getTime() + duration * 60000);
+
+          const formatICSDate = (date) => {
+            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+          };
+
+          const dtStart = formatICSDate(startDate);
+          const dtEnd = formatICSDate(endDate);
+          const dtStamp = formatICSDate(new Date());
+          
+          const summary = `[${goal?.title || '목표'}] 실행 계획: ${plan.actionText}`;
+          const description = `목표 수행 행동: ${plan.actionText}\\n목표 시간: ${formatTime(plan.durationPlanned)}`;
+
+          const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Goal Tracker//KR',
+            'CALSCALE:GREGORIAN',
+            'BEGIN:VEVENT',
+            `UID:${crypto.randomUUID()}@goaltracker`,
+            `DTSTAMP:${dtStamp}`,
+            `DTSTART:${dtStart}`,
+            `DTEND:${dtEnd}`,
+            `SUMMARY:${summary}`,
+            `DESCRIPTION:${description}`,
+            'BEGIN:VALARM',
+            'TRIGGER:-PT10M',
+            'ACTION:DISPLAY',
+            'DESCRIPTION:Reminder',
+            'END:VALARM',
+            'BEGIN:VALARM',
+            'TRIGGER:PT0M',
+            'ACTION:DISPLAY',
+            'DESCRIPTION:Reminder',
+            'END:VALARM',
+            'END:VEVENT',
+            'END:VCALENDAR'
+          ].join('\r\n');
+
+          const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `plan_${plan.id}.ics`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } catch (err) {
+          console.error('ICS 생성 에러:', err);
         }
       };
 
@@ -1063,7 +1126,7 @@
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded">
-                            {plan.date}
+                            {plan.date} {plan.timeText ? plan.timeText : ''}
                           </span>
                           <span className="text-xs text-orange-400 font-semibold">
                             {goal?.title || '연관 목표'}
@@ -1072,13 +1135,20 @@
                         <h4 className="text-base font-bold text-white">{plan.actionText}</h4>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleDownloadICS(plan, goal)}
+                          className="flex items-center gap-1 text-[10px] font-medium text-orange-400 border border-orange-500/30 bg-orange-600/10 px-2 py-1.5 rounded-lg hover:bg-orange-600/20 transition"
+                          title="스마트폰 캘린더 알림 이벤트 생성"
+                        >
+                          <Icon name="Bell" size={12} /> 캘린더 연동
+                        </button>
                         <button
                           onClick={() => setPlanToDelete(plan.id)}
-                          className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition"
+                          className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition border border-transparent"
                           title="계획 삭제"
                         >
-                          <Icon name="Trash2" size={18} />
+                          <Icon name="Trash2" size={16} />
                         </button>
                       </div>
                     </div>
@@ -1320,7 +1390,7 @@
                 <span className="font-bold text-white text-sm hidden sm:inline">최강 목표</span>
               </div>
 
-              {/* 탭 버튼들 변경: 목표 - 계획 - 실행 - 통계 - 관리자 */}
+              {/* 탭 버튼들: 목표 - 계획 - 실행 - 통계 - 관리자 */}
               <nav className="flex space-x-1 sm:space-x-2">
                 {[
                   { id: 'goals', label: '목표', icon: 'Target' },
