@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>목표 및 실행 관리 대시보드</title>
+  <title>최강 목표 - 대시보드</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,7 +17,7 @@
   <!-- Supabase JS SDK CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-black text-slate-100 min-h-screen selection:bg-indigo-500 selection:text-white">
+<body class="bg-black text-slate-100 min-h-screen selection:bg-orange-500 selection:text-white">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -36,7 +36,7 @@
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Lucide 아이콘 React 래퍼 컴포넌트 (렌더링 크래시 버그 완벽 해결)
+    // Lucide 아이콘 React 래퍼 컴포넌트
     const Icon = ({ name, size = 20, className = "" }) => {
       const spanRef = React.useRef(null);
 
@@ -45,7 +45,6 @@
           spanRef.current.innerHTML = ''; 
           try {
             const iconData = window.lucide.icons[name];
-            // 최신버전 API 우선 지원
             if (typeof window.lucide.createElement === 'function') {
               const svgElement = window.lucide.createElement(iconData);
               svgElement.setAttribute('width', size);
@@ -53,7 +52,6 @@
               if (className) svgElement.setAttribute('class', className);
               spanRef.current.appendChild(svgElement);
             } else if (typeof iconData.toSvg === 'function') {
-              // 구버전 호환용
               spanRef.current.innerHTML = iconData.toSvg({ width: size, height: size, class: className });
             }
           } catch (e) {
@@ -65,7 +63,7 @@
       return <span ref={spanRef} className="inline-flex items-center justify-center" />;
     };
 
-    // 시간 변환 헬퍼 (분 -> 시간/분 표현, 오차 해결)
+    // 시간 변환 헬퍼 (분 -> 시간/분 표현)
     const formatTime = (minutes) => {
       const m = parseInt(minutes, 10) || 0;
       if (m <= 0) return '0분';
@@ -190,7 +188,7 @@
       <CustomModal isOpen={isOpen} title="알림" onClose={onClose}>
         <p className="text-sm text-slate-300 mb-6">{message}</p>
         <div className="flex justify-end">
-          <button onClick={onClose} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-indigo-600/20">
+          <button onClick={onClose} className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-orange-600/20">
             확인
           </button>
         </div>
@@ -212,7 +210,7 @@
     );
 
     // ==========================================
-    // 3. 비밀번호 재설정 모달 (복구 링크 접속 시)
+    // 3. 비밀번호 재설정 모달
     // ==========================================
     const ResetPasswordModal = ({ isOpen, onClose }) => {
       const [newPassword, setNewPassword] = React.useState('');
@@ -246,7 +244,7 @@
         } else {
           setSuccessMsg('비밀번호가 성공적으로 변경되었습니다!');
           setTimeout(() => {
-            window.location.hash = ''; // 해시 제거
+            window.location.hash = ''; 
             onClose();
           }, 1500);
         }
@@ -278,7 +276,7 @@
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="6자리 이상 입력"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500"
               />
             </div>
 
@@ -290,7 +288,7 @@
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="비밀번호 재입력"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500"
               />
             </div>
 
@@ -298,7 +296,7 @@
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition disabled:opacity-50"
+                className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg transition disabled:opacity-50"
               >
                 {loading ? '변경 중...' : '비밀번호 변경 완료'}
               </button>
@@ -372,10 +370,10 @@
         <div className="min-h-screen flex items-center justify-center p-4 bg-black relative z-10">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
             <div className="text-center mb-8">
-              <div className="w-12 h-12 bg-indigo-600/20 text-indigo-400 rounded-xl flex items-center justify-center mx-auto mb-3 border border-indigo-500/30">
+              <div className="w-12 h-12 bg-orange-600/20 text-orange-400 rounded-xl flex items-center justify-center mx-auto mb-3 border border-orange-500/30">
                 <Icon name="Target" size={28} />
               </div>
-              <h1 className="text-2xl font-bold text-white">목표 실행 대시보드</h1>
+              <h1 className="text-2xl font-bold text-white">최강 목표</h1>
               <p className="text-sm text-slate-400 mt-1">체계적인 목표 수립과 실행 서비스</p>
             </div>
 
@@ -397,7 +395,7 @@
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 transition"
                 />
               </div>
 
@@ -410,7 +408,7 @@
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 transition"
                   />
                 </div>
               )}
@@ -422,7 +420,7 @@
                     id="privacy"
                     checked={privacyAgreed}
                     onChange={(e) => setPrivacyAgreed(e.target.checked)}
-                    className="mt-1 rounded bg-slate-950 border-slate-800 text-indigo-600 focus:ring-0"
+                    className="mt-1 rounded bg-slate-950 border-slate-800 text-orange-600 focus:ring-0"
                   />
                   <label htmlFor="privacy" className="text-xs text-slate-400 leading-relaxed cursor-pointer">
                     [필수] 개인정보 수집 및 데이터 처리에 동의합니다.
@@ -433,7 +431,7 @@
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition shadow-lg shadow-indigo-600/20 disabled:opacity-50 mt-2"
+                className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-xl transition shadow-lg shadow-orange-600/20 disabled:opacity-50 mt-2"
               >
                 {loading ? '처리 중...' : isForgotPassword ? '비밀번호 재설정 메일 발송' : isSignUp ? '회원가입' : '로그인'}
               </button>
@@ -500,7 +498,6 @@
         setMilestones(milestones.filter(m => m.id !== id));
       };
 
-      // 드래그 앤 드롭 핸들러 (null 참조 방어 로직)
       const handleDragStart = (e, index) => {
         setDraggedIndex(index);
         e.dataTransfer.effectAllowed = "move";
@@ -539,7 +536,7 @@
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="예: 사이드 프로젝트 출시하기"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500"
               />
             </div>
 
@@ -549,7 +546,7 @@
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500"
                 >
                   <option value="커리어">커리어</option>
                   <option value="자기계발">자기계발</option>
@@ -565,7 +562,7 @@
                   required
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500"
                 />
               </div>
             </div>
@@ -577,7 +574,7 @@
                 <button
                   type="button"
                   onClick={handleAddMilestone}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20"
+                  className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1 bg-orange-500/10 px-2.5 py-1 rounded-lg border border-orange-500/20"
                 >
                   <Icon name="Plus" size={14} /> 중간 단계 추가
                 </button>
@@ -595,7 +592,7 @@
                       onDragOver={(e) => handleDragOver(e, idx)}
                       onDragEnd={handleDragEnd}
                       className={`flex items-center gap-2 bg-slate-950 p-2 rounded-xl border ${
-                        draggedIndex === idx ? 'border-indigo-500 bg-slate-800/50' : 'border-slate-800'
+                        draggedIndex === idx ? 'border-orange-500 bg-slate-800/50' : 'border-slate-800'
                       }`}
                     >
                       <div className="cursor-grab text-slate-500 hover:text-slate-300 p-1">
@@ -637,7 +634,7 @@
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg"
+                className="px-4 py-2 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-lg"
               >
                 저장하기
               </button>
@@ -674,7 +671,7 @@
             </div>
             <button
               onClick={() => { setSelectedGoal(null); setIsModalOpen(true); }}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/20"
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-xl flex items-center gap-1.5 shadow-lg shadow-orange-600/20"
             >
               <Icon name="Plus" size={16} /> 목표 추가
             </button>
@@ -701,7 +698,7 @@
                   >
                     <div>
                       <div className="flex justify-between items-start mb-3">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-indigo-400 border border-indigo-500/20">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-orange-400 border border-orange-500/20">
                           {goal.category}
                         </span>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
@@ -710,7 +707,7 @@
                           {dDay}
                         </span>
                       </div>
-                      <h3 className="font-bold text-white text-base group-hover:text-indigo-400 transition mb-2">
+                      <h3 className="font-bold text-white text-base group-hover:text-orange-400 transition mb-2">
                         {goal.title}
                       </h3>
                     </div>
@@ -736,14 +733,13 @@
     };
 
     // ==========================================
-    // 7. 뷰 2: 실행 페이지 (대화형 대시보드)
+    // 7. 뷰 2: 계획 페이지 (기존 '실행 페이지')
     // ==========================================
     const ExecutionView = ({ goals, onSavePlan }) => {
       const [mode, setMode] = React.useState('wizard'); // wizard | simple
       const [step, setStep] = React.useState(1);
       const [alertMsg, setAlertMsg] = React.useState('');
 
-      // 실행 작성 폼 상태
       const [selectedGoalId, setSelectedGoalId] = React.useState('');
       const [selectedMilestoneId, setSelectedMilestoneId] = React.useState('');
       const [actionText, setActionText] = React.useState('');
@@ -771,9 +767,8 @@
           notes: ''
         };
         onSavePlan(newPlan);
-        setAlertMsg('오늘의 실행 계획이 저장되었습니다! 일지 탭에서 확인하세요.');
+        setAlertMsg('오늘의 계획이 저장되었습니다! 실행 탭에서 확인하세요.');
         
-        // 폼 초기화
         setSelectedGoalId('');
         setSelectedMilestoneId('');
         setActionText('');
@@ -793,7 +788,7 @@
             <button
               onClick={() => setMode('wizard')}
               className={`flex-1 py-2 text-xs font-semibold rounded-xl transition ${
-                mode === 'wizard' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                mode === 'wizard' ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
               대화형 입력 (질문단계별)
@@ -801,7 +796,7 @@
             <button
               onClick={() => setMode('simple')}
               className={`flex-1 py-2 text-xs font-semibold rounded-xl transition ${
-                mode === 'simple' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                mode === 'simple' ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
               간편 입력 (한 화면 전체)
@@ -812,7 +807,7 @@
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
               {step === 1 && (
                 <div className="space-y-4">
-                  <span className="text-xs font-bold text-indigo-400">Q1. 목표 선택</span>
+                  <span className="text-xs font-bold text-orange-400">Q1. 목표 선택</span>
                   <h3 className="text-lg font-bold text-white">오늘은 어떤 목표를 위해 노력하실 건가요?</h3>
                   <select
                     value={selectedGoalId}
@@ -842,7 +837,7 @@
                   <button
                     disabled={!selectedGoalId}
                     onClick={() => setStep(2)}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition"
+                    className="w-full py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition"
                   >
                     다음 단계로
                   </button>
@@ -851,7 +846,7 @@
 
               {step === 2 && (
                 <div className="space-y-4">
-                  <span className="text-xs font-bold text-indigo-400">Q2. 구체적 행동</span>
+                  <span className="text-xs font-bold text-orange-400">Q2. 구체적 행동</span>
                   <h3 className="text-lg font-bold text-white">선택한 목표를 위해 구체적으로 뭘 하실 건가요?</h3>
                   <textarea
                     rows="3"
@@ -862,14 +857,14 @@
                   />
                   <div className="flex gap-2">
                     <button onClick={() => setStep(1)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl">이전</button>
-                    <button disabled={!actionText} onClick={() => setStep(3)} className="w-2/3 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl">다음 단계로</button>
+                    <button disabled={!actionText} onClick={() => setStep(3)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl">다음 단계로</button>
                   </div>
                 </div>
               )}
 
               {step === 3 && (
                 <div className="space-y-4">
-                  <span className="text-xs font-bold text-indigo-400">Q3. 시간 수립</span>
+                  <span className="text-xs font-bold text-orange-400">Q3. 시간 수립</span>
                   <h3 className="text-lg font-bold text-white">오늘 중에 언제, 얼마나 하시겠어요?</h3>
                   <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">시점 (예: 퇴근 후 오후 8시)</label>
@@ -891,25 +886,25 @@
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setStep(2)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl">이전</button>
-                    <button onClick={() => setStep(4)} className="w-2/3 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl">다음 단계로</button>
+                    <button onClick={() => setStep(4)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl">다음 단계로</button>
                   </div>
                 </div>
               )}
 
               {step === 4 && (
                 <div className="space-y-4">
-                  <span className="text-xs font-bold text-indigo-400">Q4. 장애요인 점검</span>
+                  <span className="text-xs font-bold text-orange-400">Q4. 장애요인 점검</span>
                   <h3 className="text-lg font-bold text-white">혹시 오늘 그 일을 하기 어렵게 만들만한 게 있을까요?</h3>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setHasBlocker(true)}
-                      className={`flex-1 py-3 border rounded-xl font-medium text-sm ${hasBlocker ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                      className={`flex-1 py-3 border rounded-xl font-medium text-sm ${hasBlocker ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
                     >
                       있다
                     </button>
                     <button
                       onClick={() => { setHasBlocker(false); setStep(5); }}
-                      className={`flex-1 py-3 border rounded-xl font-medium text-sm ${!hasBlocker ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                      className={`flex-1 py-3 border rounded-xl font-medium text-sm ${!hasBlocker ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
                     >
                       없다
                     </button>
@@ -936,14 +931,14 @@
 
                   <div className="flex gap-2">
                     <button onClick={() => setStep(3)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl">이전</button>
-                    <button onClick={() => setStep(5)} className="w-2/3 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl">최종 점검으로</button>
+                    <button onClick={() => setStep(5)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl">최종 점검으로</button>
                   </div>
                 </div>
               )}
 
               {step === 5 && (
                 <div className="space-y-6">
-                  <span className="text-xs font-bold text-indigo-400">Q5. 최종 확인</span>
+                  <span className="text-xs font-bold text-orange-400">Q5. 최종 확인</span>
                   <h3 className="text-lg font-bold text-white">최종적으로, 방금 세우신 오늘 계획 정말 실천 가능하세요?</h3>
 
                   <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
@@ -1014,9 +1009,9 @@
               <button
                 disabled={!selectedGoalId || !actionText}
                 onClick={handleComplete}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition mt-2"
+                className="w-full py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition mt-2"
               >
-                일지에 바로 저장하기
+                계획 저장하기
               </button>
             </div>
           )}
@@ -1025,7 +1020,7 @@
     };
 
     // ==========================================
-    // 8. 뷰 3: 일일 일지 (복기 및 삭제)
+    // 8. 뷰 3: 실행 페이지 (기존 '일일 일지')
     // ==========================================
     const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan }) => {
       const [planToDelete, setPlanToDelete] = React.useState(null);
@@ -1041,13 +1036,13 @@
         <div className="space-y-6 relative z-10">
           <ConfirmModal 
             isOpen={!!planToDelete} 
-            message="정말 이 일일 계획을 삭제하시겠습니까?" 
+            message="정말 이 계획을 삭제하시겠습니까?" 
             onConfirm={confirmDelete}
             onClose={() => setPlanToDelete(null)}
           />
 
           <div>
-            <h2 className="text-xl font-bold text-white">실행 목록 일지</h2>
+            <h2 className="text-xl font-bold text-white">실행 및 복기</h2>
             <p className="text-xs text-slate-400">수행한 계획의 결과를 정확히 작성해 성장을 기록하세요.</p>
           </div>
 
@@ -1070,7 +1065,7 @@
                           <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded">
                             {plan.date}
                           </span>
-                          <span className="text-xs text-indigo-400 font-semibold">
+                          <span className="text-xs text-orange-400 font-semibold">
                             {goal?.title || '연관 목표'}
                           </span>
                         </div>
@@ -1100,7 +1095,7 @@
                           value={plan.durationActual || ''}
                           onChange={(e) => onUpdatePlan({ ...plan, durationActual: parseInt(e.target.value, 10) || 0 })}
                           placeholder="분 단위 입력"
-                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white focus:outline-none focus:border-indigo-500 transition"
+                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white focus:outline-none focus:border-orange-500 transition"
                         />
                       </div>
                       <div>
@@ -1123,7 +1118,7 @@
                         value={plan.notes || ''}
                         onChange={(e) => onUpdatePlan({ ...plan, notes: e.target.value })}
                         placeholder="오늘의 성과나 피드백을 자유롭게 기록하세요."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500 transition"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500 transition"
                       />
                     </div>
                   </div>
@@ -1158,7 +1153,7 @@
                 <button
                   key={type}
                   onClick={() => setFilter(type)}
-                  className={`px-3 py-1.5 rounded-lg capitalize ${filter === type ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white transition'}`}
+                  className={`px-3 py-1.5 rounded-lg capitalize ${filter === type ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white transition'}`}
                 >
                   {type === 'weekly' ? '주간' : type === 'monthly' ? '월간' : '연간'}
                 </button>
@@ -1169,7 +1164,7 @@
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
               <span className="text-xs text-slate-400 block mb-1">종합 달성률</span>
-              <span className="text-3xl font-black text-indigo-400">{completionRate}%</span>
+              <span className="text-3xl font-black text-orange-400">{completionRate}%</span>
               <p className="text-[10px] text-slate-500 mt-2">총 {plans.length}개 계획 중 {completedPlans.length}개 완료</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
@@ -1209,7 +1204,7 @@
             </div>
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
               <span className="text-xs text-slate-400 block">총 등록된 목표 수</span>
-              <span className="text-2xl font-bold text-indigo-400 mt-1">{adminData.goals.length} 개</span>
+              <span className="text-2xl font-bold text-orange-400 mt-1">{adminData.goals.length} 개</span>
             </div>
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
               <span className="text-xs text-slate-400 block">전체 실행 계획 수</span>
@@ -1232,7 +1227,6 @@
       const [isResetModalOpen, setIsResetModalOpen] = React.useState(false);
       const [logoutConfirm, setLogoutConfirm] = React.useState(false);
 
-      // 비밀번호 재설정 토큰 감지 (URL 해시 파싱)
       React.useEffect(() => {
         const handleHashChange = () => {
           const hash = window.location.hash;
@@ -1246,7 +1240,6 @@
         return () => window.removeEventListener('hashchange', handleHashChange);
       }, []);
 
-      // 초기 인증 및 데이터 로드
       React.useEffect(() => {
         api.auth.getUser().then(u => {
           if (u) {
@@ -1321,18 +1314,18 @@
           <header className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-slate-800">
             <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-16">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black">
-                  G
+                <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center text-white font-black">
+                  C
                 </div>
-                <span className="font-bold text-white text-sm hidden sm:inline">GOAL DASHBOARD</span>
+                <span className="font-bold text-white text-sm hidden sm:inline">최강 목표</span>
               </div>
 
-              {/* 탭 버튼들 */}
+              {/* 탭 버튼들 변경: 목표 - 계획 - 실행 - 통계 - 관리자 */}
               <nav className="flex space-x-1 sm:space-x-2">
                 {[
                   { id: 'goals', label: '목표', icon: 'Target' },
-                  { id: 'execution', label: '실행', icon: 'Zap' },
-                  { id: 'journal', label: '일일 일지', icon: 'BookOpen' },
+                  { id: 'execution', label: '계획', icon: 'Zap' },
+                  { id: 'journal', label: '실행', icon: 'BookOpen' },
                   { id: 'stats', label: '통계', icon: 'BarChart2' },
                   ...(isAdmin ? [{ id: 'admin', label: '관리자', icon: 'Shield' }] : [])
                 ].map(tab => (
@@ -1340,7 +1333,7 @@
                     key={tab.id}
                     onClick={() => setCurrentTab(tab.id)}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
-                      currentTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      currentTab === tab.id ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                     }`}
                   >
                     <Icon name={tab.icon} size={15} />
