@@ -24,8 +24,8 @@
     // 0. Supabase 연동 설정 & 지연 함수
     // ==========================================
     // 실제 프로젝트의 Supabase URL과 Anon Key로 교체하여 사용하세요.
-    const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD";
+    const SUPABASE_URL = "https://your-project.supabase.co";
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 
     let supabase;
     try {
@@ -36,34 +36,7 @@
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Lucide 아이콘 React 래퍼 컴포넌트
-    const Icon = ({ name, size = 20, className = "" }) => {
-      const spanRef = React.useRef(null);
-
-      React.useEffect(() => {
-        if (spanRef.current && window.lucide && window.lucide.icons && window.lucide.icons[name]) {
-          spanRef.current.innerHTML = ''; 
-          try {
-            const iconData = window.lucide.icons[name];
-            if (typeof window.lucide.createElement === 'function') {
-              const svgElement = window.lucide.createElement(iconData);
-              svgElement.setAttribute('width', size);
-              svgElement.setAttribute('height', size);
-              if (className) svgElement.setAttribute('class', className);
-              spanRef.current.appendChild(svgElement);
-            } else if (typeof iconData.toSvg === 'function') {
-              spanRef.current.innerHTML = iconData.toSvg({ width: size, height: size, class: className });
-            }
-          } catch (e) {
-            console.warn("아이콘 렌더링 중 에러 발생:", e);
-          }
-        }
-      }, [name, size, className]);
-
-      return <span ref={spanRef} className="inline-flex items-center justify-center" />;
-    };
-
-    // 시간 변환 헬퍼 (분 -> 시간/분 표현, 오차 해결 완벽 적용)
+    // 시간 변환 헬퍼 (분 -> 시간/분 표현)
     const formatTime = (minutes) => {
       const m = parseInt(minutes, 10) || 0;
       if (m <= 0) return '0분';
@@ -72,6 +45,33 @@
       if (hrs > 0 && mins > 0) return `${hrs}시간 ${mins}분`;
       if (hrs > 0) return `${hrs}시간`;
       return `${mins}분`;
+    };
+
+    // 캘린더 알림(구글 캘린더) 생성 헬퍼 함수
+    const generateGoogleCalendarLink = (plan, goal) => {
+      try {
+        const dateStr = plan.date || new Date().toISOString().split('T')[0];
+        const timeStr = plan.timeText || "12:00";
+        
+        const startDate = new Date(`${dateStr}T${timeStr}:00`);
+        const duration = parseInt(plan.durationPlanned, 10) || 30;
+        const endDate = new Date(startDate.getTime() + duration * 60000);
+
+        const formatGoogleDate = (date) => {
+          return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const dtStart = formatGoogleDate(startDate);
+        const dtEnd = formatGoogleDate(endDate);
+
+        const summary = encodeURIComponent(`[${goal?.title || '목표'}] 실행 계획: ${plan.actionText}`);
+        const description = encodeURIComponent(`목표 수행 행동: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 시점: ' + plan.timeMemo : ''}`);
+
+        const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${summary}&details=${description}&dates=${dtStart}/${dtEnd}`;
+        window.open(url, '_blank');
+      } catch (err) {
+        console.error('구글 캘린더 링크 생성 에러:', err);
+      }
     };
 
     // 캘린더 알림(.ics) 생성 헬퍼 함수
@@ -782,29 +782,41 @@
     };
 
     // ==========================================
-    // 7. 뷰 2: 계획 페이지 (대화형 대시보드 + 캘린더 연동 팝업)
+    // 7. 뷰 2: 실행 페이지 (대화형 대시보드)
     // ==========================================
     const ExecutionView = ({ goals, onSavePlan }) => {
       const [mode, setMode] = React.useState('wizard'); // wizard | simple
       const [step, setStep] = React.useState(1);
-      
+
       // 실행 작성 폼 상태
       const [selectedGoalId, setSelectedGoalId] = React.useState('');
       const [selectedMilestoneId, setSelectedMilestoneId] = React.useState('');
       const [actionText, setActionText] = React.useState('');
-      const [timeText, setTimeText] = React.useState(''); // type="time"
-      const [timeMemo, setTimeMemo] = React.useState(''); // 상세 메모
       const [durationPlanned, setDurationPlanned] = React.useState(30);
       const [hasBlocker, setHasBlocker] = React.useState(false);
       const [blockerText, setBlockerText] = React.useState('');
       const [solutionText, setSolutionText] = React.useState('');
 
-      // 저장 후 캘린더 연동 모달 띄우기용
-      const [successPlanInfo, setSuccessPlanInfo] = React.useState(null);
+      // 최종 저장 모달 및 시간/메모 상태
+      const [isFinalModalOpen, setIsFinalModalOpen] = React.useState(false);
+      const [timeText, setTimeText] = React.useState(''); // type="time"
+      const [timeMemo, setTimeMemo] = React.useState(''); // 상세 메모
 
       const activeGoal = goals.find(g => g.id === selectedGoalId);
 
+      const handleOpenFinalModal = () => {
+        if (!selectedGoalId || !actionText || !durationPlanned) {
+          alert('목표, 구체적 행동, 수행 시간을 모두 입력해주세요.');
+          return;
+        }
+        setIsFinalModalOpen(true);
+      };
+
       const handleComplete = async () => {
+        if (!timeText) {
+          alert('실행 예정 시간을 설정해주세요.');
+          return;
+        }
         const newPlan = {
           date: new Date().toISOString().split('T')[0],
           goalId: selectedGoalId,
@@ -820,14 +832,9 @@
           durationActual: 0,
           notes: ''
         };
-        // DB 저장 후 반환된 객체를 받음
-        const savedPlan = await onSavePlan(newPlan);
+        await onSavePlan(newPlan);
         
-        // 성공 팝업 활성화
-        setSuccessPlanInfo({ plan: savedPlan, goal: activeGoal });
-      };
-
-      const resetForm = () => {
+        // 폼 초기화
         setSelectedGoalId('');
         setSelectedMilestoneId('');
         setActionText('');
@@ -838,37 +845,77 @@
         setBlockerText('');
         setSolutionText('');
         setStep(1);
-        setSuccessPlanInfo(null);
+        setIsFinalModalOpen(false);
       };
+
+      const getEphemeralPlan = () => ({
+        date: new Date().toISOString().split('T')[0],
+        actionText,
+        timeText: timeText || "12:00",
+        durationPlanned: parseInt(durationPlanned, 10) || 30,
+        timeMemo,
+        id: crypto.randomUUID()
+      });
 
       return (
         <div className="max-w-2xl mx-auto space-y-6 relative z-10">
           
-          {/* 성공 및 캘린더 등록 팝업 모달 */}
-          <CustomModal isOpen={!!successPlanInfo} title="계획 수립 완료!" onClose={resetForm}>
-            <div className="text-center space-y-4 pb-4">
-              <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
-                <Icon name="CheckCircle" size={32} />
+          {/* 최종 저장 및 캘린더 등록 모달 */}
+          <CustomModal isOpen={isFinalModalOpen} title="최종 실행 계획 저장" onClose={() => setIsFinalModalOpen(false)}>
+            <div className="space-y-5">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+                <p><span className="text-slate-400">목표:</span> <strong className="text-white">{activeGoal?.title}</strong></p>
+                <p><span className="text-slate-400">실행 행동:</span> <strong className="text-white">{actionText}</strong></p>
+                <p><span className="text-slate-400">목표 시간:</span> <strong className="text-white">{formatTime(durationPlanned)}</strong></p>
               </div>
-              <h3 className="text-lg font-bold text-white">멋진 계획이네요!</h3>
-              <p className="text-sm text-slate-400">
-                오늘의 실행 계획이 성공적으로 저장되었습니다.<br/>
-                잊지 않도록 스마트폰 캘린더에 바로 등록해 보세요.
-              </p>
-              
-              <div className="pt-4 flex flex-col gap-3">
-                <button 
-                  onClick={() => generateCalendarICS(successPlanInfo.plan, successPlanInfo.goal)}
-                  className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl shadow-lg shadow-orange-600/20 flex items-center justify-center gap-2 transition"
+
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간 (필수)</label>
+                  <input
+                    type="time"
+                    value={timeText}
+                    onChange={(e) => setTimeText(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500"
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">실행 시점 상세 메모 (선택)</label>
+                  <input
+                    type="text"
+                    value={timeMemo}
+                    onChange={(e) => setTimeMemo(e.target.value)}
+                    placeholder="예: 점심 식사 후 카페에서, 퇴근 직후 등"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-800">
+                <label className="block text-xs font-medium text-slate-400 mb-2">스마트폰 캘린더 연동 (선택)</label>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => generateGoogleCalendarLink(getEphemeralPlan(), activeGoal)}
+                    className="flex-1 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-600/30 font-medium text-xs rounded-xl transition flex items-center justify-center gap-1.5"
+                  >
+                    📅 구글 캘린더 등록
+                  </button>
+                  <button 
+                    onClick={() => generateCalendarICS(getEphemeralPlan(), activeGoal)}
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-medium text-xs rounded-xl transition flex items-center justify-center gap-1.5"
+                  >
+                    🍏 애플 캘린더 등록
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleComplete}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition text-sm"
                 >
-                  <Icon name="Bell" size={18} />
-                  캘린더에 알림 추가 (.ics)
-                </button>
-                <button 
-                  onClick={resetForm}
-                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition"
-                >
-                  닫기 및 새 계획 짜기
+                  최종 실행 계획 저장
                 </button>
               </div>
             </div>
@@ -876,17 +923,17 @@
 
           <div className="flex justify-between items-center bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
             <button
-              onClick={() => setMode('wizard')}
+              onClick={() => { setMode('wizard'); setStep(1); }}
               className={`flex-1 py-2 text-xs font-semibold rounded-xl transition ${
-                mode === 'wizard' ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                mode === 'wizard' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
               대화형 입력 (질문단계별)
             </button>
             <button
-              onClick={() => setMode('simple')}
+              onClick={() => { setMode('simple'); setStep(1); }}
               className={`flex-1 py-2 text-xs font-semibold rounded-xl transition ${
-                mode === 'simple' ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                mode === 'simple' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
               간편 입력 (한 화면 전체)
@@ -897,7 +944,7 @@
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
               {step === 1 && (
                 <div className="space-y-4">
-                  <span className="text-xs font-bold text-orange-400">Q1. 목표 선택</span>
+                  <span className="text-xs font-bold text-indigo-400">Q1. 목표 선택</span>
                   <h3 className="text-lg font-bold text-white">오늘은 어떤 목표를 위해 노력하실 건가요?</h3>
                   <select
                     value={selectedGoalId}
@@ -927,7 +974,7 @@
                   <button
                     disabled={!selectedGoalId}
                     onClick={() => setStep(2)}
-                    className="w-full py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition"
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition"
                   >
                     다음 단계로
                   </button>
@@ -936,81 +983,58 @@
 
               {step === 2 && (
                 <div className="space-y-4">
-                  <span className="text-xs font-bold text-orange-400">Q2. 구체적 행동</span>
-                  <h3 className="text-lg font-bold text-white">선택한 목표를 위해 구체적으로 뭘 하실 건가요?</h3>
+                  <span className="text-xs font-bold text-indigo-400">Q2. 구체적 행동</span>
+                  <h3 className="text-lg font-bold text-white">선택한 목표를 위해 '오늘' 구체적으로 뭘 하실 건가요?</h3>
                   <textarea
                     rows="3"
                     value={actionText}
                     onChange={(e) => setActionText(e.target.value)}
                     placeholder="예: 공식 문서 읽고 예제 실습 2개 진행"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500"
                   />
                   <div className="flex gap-2">
                     <button onClick={() => setStep(1)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl hover:bg-slate-700">이전</button>
-                    <button disabled={!actionText} onClick={() => setStep(3)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl">다음 단계로</button>
+                    <button disabled={!actionText} onClick={() => setStep(3)} className="w-2/3 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl">다음 단계로</button>
                   </div>
                 </div>
               )}
 
               {step === 3 && (
                 <div className="space-y-4">
-                  <span className="text-xs font-bold text-orange-400">Q3. 시간 수립</span>
-                  <h3 className="text-lg font-bold text-white">오늘 중에 언제, 얼마나 하시겠어요?</h3>
+                  <span className="text-xs font-bold text-indigo-400">Q3. 시간 수립</span>
+                  <h3 className="text-lg font-bold text-white">오늘 그 행동을 수행하는 데 몇 분 정도를 투자하시겠어요?</h3>
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간 (필수)</label>
-                      <input
-                        type="time"
-                        value={timeText}
-                        onChange={(e) => setTimeText(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm color-scheme-dark focus:outline-none focus:border-orange-500"
-                        style={{ colorScheme: 'dark' }}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">목표 수행 시간 (분)</label>
-                      <input
-                        type="number"
-                        value={durationPlanned}
-                        onChange={(e) => setDurationPlanned(parseInt(e.target.value, 10) || 0)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500"
-                      />
-                    </div>
-                  </div>
-
                   <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">상세 시점 / 메모 (선택)</label>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">목표 수행 시간 (분)</label>
                     <input
-                      type="text"
-                      value={timeMemo}
-                      onChange={(e) => setTimeMemo(e.target.value)}
-                      placeholder="예: 점심 식사 후 카페에서, 퇴근 직후 등"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500"
+                      type="number"
+                      value={durationPlanned}
+                      onChange={(e) => setDurationPlanned(parseInt(e.target.value, 10) || 0)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                   
                   <div className="flex gap-2 pt-2">
                     <button onClick={() => setStep(2)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl hover:bg-slate-700">이전</button>
-                    <button onClick={() => setStep(4)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl">다음 단계로</button>
+                    <button onClick={() => setStep(4)} className="w-2/3 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl">다음 단계로</button>
                   </div>
                 </div>
               )}
 
               {step === 4 && (
                 <div className="space-y-4">
-                  <span className="text-xs font-bold text-orange-400">Q4. 장애요인 점검</span>
+                  <span className="text-xs font-bold text-indigo-400">Q4. 장애요인 점검</span>
                   <h3 className="text-lg font-bold text-white">혹시 오늘 그 일을 하기 어렵게 만들만한 게 있을까요?</h3>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setHasBlocker(true)}
-                      className={`flex-1 py-3 border rounded-xl font-medium text-sm ${hasBlocker ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                      className={`flex-1 py-3 border rounded-xl font-medium text-sm ${hasBlocker ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
                     >
                       있다
                     </button>
                     <button
-                      onClick={() => { setHasBlocker(false); setStep(5); }}
-                      className={`flex-1 py-3 border rounded-xl font-medium text-sm ${!hasBlocker ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                      onClick={() => setHasBlocker(false)}
+                      className={`flex-1 py-3 border rounded-xl font-medium text-sm ${!hasBlocker ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
                     >
                       없다
                     </button>
@@ -1023,49 +1047,21 @@
                         placeholder="어떤 문제인가요?"
                         value={blockerText}
                         onChange={(e) => setBlockerText(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500"
                       />
                       <input
                         type="text"
                         placeholder="대처는 어떻게 해보시겠어요?"
                         value={solutionText}
                         onChange={(e) => setSolutionText(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500"
                       />
                     </div>
                   )}
 
                   <div className="flex gap-2 pt-2">
                     <button onClick={() => setStep(3)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl hover:bg-slate-700">이전</button>
-                    <button onClick={() => setStep(5)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl">최종 점검으로</button>
-                  </div>
-                </div>
-              )}
-
-              {step === 5 && (
-                <div className="space-y-6">
-                  <span className="text-xs font-bold text-orange-400">Q5. 최종 확인</span>
-                  <h3 className="text-lg font-bold text-white">최종적으로, 방금 세우신 오늘 계획 정말 실천 가능하세요?</h3>
-
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
-                    <p><span className="text-slate-400">목표:</span> <strong className="text-white">{activeGoal?.title}</strong></p>
-                    <p><span className="text-slate-400">실행 행동:</span> <strong className="text-white">{actionText}</strong></p>
-                    <p>
-                      <span className="text-slate-400">수행 시점:</span> 
-                      <strong className="text-white">
-                        {timeText || '미지정'} {timeMemo ? `(${timeMemo})` : ''} - {formatTime(durationPlanned)}
-                      </strong>
-                    </p>
-                    {hasBlocker && <p><span className="text-slate-400">장애요인 대처:</span> <strong className="text-white">{solutionText}</strong></p>}
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button onClick={() => setStep(1)} className="flex-1 py-3 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-700">
-                      다시 생각해볼게
-                    </button>
-                    <button onClick={handleComplete} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-600/20">
-                      물론, 가능하지!
-                    </button>
+                    <button onClick={handleOpenFinalModal} className="w-2/3 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl shadow-lg shadow-emerald-600/20">최종 저장 단계로</button>
                   </div>
                 </div>
               )}
@@ -1077,7 +1073,7 @@
                 <select
                   value={selectedGoalId}
                   onChange={(e) => setSelectedGoalId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm mb-2 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm mb-2 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">-- 목표 선택 --</option>
                   {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
@@ -1090,32 +1086,36 @@
                   rows="2"
                   value={actionText}
                   onChange={(e) => setActionText(e.target.value)}
-                  placeholder="무엇을 하실 건가요?"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500"
+                  placeholder="선택한 목표를 위해 '오늘' 구체적으로 뭘 하실 건가요?"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간 (필수)</label>
-                  <input
-                    type="time"
-                    value={timeText}
-                    onChange={(e) => setTimeText(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm color-scheme-dark focus:outline-none focus:border-orange-500"
-                    style={{ colorScheme: 'dark' }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">목표 시간(분)</label>
-                  <input
-                    type="number"
-                    value={durationPlanned}
-                    onChange={(e) => setDurationPlanned(parseInt(e.target.value, 10) || 0)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">목표 시간(분)</label>
+                <input
+                  type="number"
+                  value={durationPlanned}
+                  onChange={(e) => setDurationPlanned(parseInt(e.target.value, 10) || 0)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500"
+                />
               </div>
+
+              <button
+                disabled={!selectedGoalId || !actionText}
+                onClick={handleOpenFinalModal}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition mt-2 shadow-lg shadow-emerald-600/20"
+              >
+                최종 단계 및 저장하기
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ==========================================
+    // 8. 뷰 3: 실행 목록 일지 (복기 및 삭제)
 
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">상세 시점 / 메모 (선택)</label>
