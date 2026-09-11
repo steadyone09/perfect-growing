@@ -36,6 +36,29 @@
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+    // Lucide 아이콘 React 래퍼 컴포넌트 (최신 버전 호환)
+    const Icon = ({ name, size = 20, className = "" }) => {
+      const spanRef = React.useRef(null);
+      
+      React.useEffect(() => {
+        if (spanRef.current && window.lucide && window.lucide.icons[name]) {
+          spanRef.current.innerHTML = '';
+          try {
+            const svg = window.lucide.createElement(window.lucide.icons[name]);
+            svg.setAttribute('width', size);
+            svg.setAttribute('height', size);
+            svg.setAttribute('stroke-width', '2');
+            if (className) svg.setAttribute('class', className);
+            spanRef.current.appendChild(svg);
+          } catch (e) {
+            console.error("아이콘 렌더링 에러:", e);
+          }
+        }
+      }, [name, size, className]);
+
+      return <span ref={spanRef} className={`inline-flex items-center justify-center ${className}`} />;
+    };
+
     // 시간 변환 헬퍼 (분 -> 시간/분 표현)
     const formatTime = (minutes) => {
       const m = parseInt(minutes, 10) || 0;
@@ -1107,33 +1130,6 @@
                 className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition mt-2 shadow-lg shadow-emerald-600/20"
               >
                 최종 단계 및 저장하기
-              </button>
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    // ==========================================
-    // 8. 뷰 3: 실행 목록 일지 (복기 및 삭제)
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">상세 시점 / 메모 (선택)</label>
-                <input
-                  type="text"
-                  value={timeMemo}
-                  onChange={(e) => setTimeMemo(e.target.value)}
-                  placeholder="예: 점심 식사 후 카페에서"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm mb-2 focus:outline-none focus:border-orange-500"
-                />
-              </div>
-
-              <button
-                disabled={!selectedGoalId || !actionText}
-                onClick={handleComplete}
-                className="w-full py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition mt-2 shadow-lg shadow-orange-600/20"
-              >
-                계획 저장하기
               </button>
             </div>
           )}
