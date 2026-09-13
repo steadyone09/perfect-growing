@@ -70,7 +70,7 @@
       return `${mins}분`;
     };
 
-    // 캘린더 알림(구글 캘린더) 생성 헬퍼 함수
+    // 캘린더 알림(구글 캘린더) 딥링크 생성 헬퍼 함수
     const generateGoogleCalendarLink = (plan, goal) => {
       try {
         const dateStr = plan.date || new Date().toISOString().split('T')[0];
@@ -87,11 +87,33 @@
         const dtStart = formatGoogleDate(startDate);
         const dtEnd = formatGoogleDate(endDate);
 
-        const summary = encodeURIComponent(`[${goal?.title || '목표'}] 실행 계획: ${plan.actionText}`);
-        const description = encodeURIComponent(`목표 수행 행동: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 시점: ' + plan.timeMemo : ''}`);
+        const rawSummary = `[${goal?.title || '목표'}] 실행 계획: ${plan.actionText}`;
+        const rawDescription = `목표 수행 행동: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 시점: ' + plan.timeMemo : ''}`;
+        
+        const summary = encodeURIComponent(rawSummary);
+        const description = encodeURIComponent(rawDescription);
 
-        const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${summary}&details=${description}&dates=${dtStart}/${dtEnd}`;
-        window.open(url, '_blank');
+        const webUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${summary}&details=${description}&dates=${dtStart}/${dtEnd}`;
+
+        const isAndroid = /android/i.test(navigator.userAgent);
+        const isIOS = /ipad|iphone|ipod/i.test(navigator.userAgent) && !window.MSStream;
+
+        if (isAndroid) {
+          // 안드로이드 구글 캘린더 앱 직접 호출 인텐트
+          const intentUrl = `intent://com.android.calendar/events#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event;S.title=${summary};S.description=${description};l.beginTime=${startDate.getTime()};l.endTime=${endDate.getTime()};scheme=content;package=com.google.android.calendar;S.browser_fallback_url=${encodeURIComponent(webUrl)};end;`;
+          window.location.href = intentUrl;
+        } else if (isIOS) {
+          // iOS 구글 캘린더 앱 딥링크 호출
+          const iosUrl = webUrl.replace('https://', 'googlecalendar://');
+          window.location.href = iosUrl;
+          // 미설치 시 웹 브라우저 Fallback
+          setTimeout(() => {
+            window.open(webUrl, '_blank');
+          }, 500);
+        } else {
+          // PC 환경
+          window.open(webUrl, '_blank');
+        }
       } catch (err) {
         console.error('구글 캘린더 링크 생성 에러:', err);
       }
@@ -897,13 +919,13 @@
                       onClick={() => generateGoogleCalendarLink(savedPlanData.plan, savedPlanData.goal)}
                       className="flex-1 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-600/30 font-medium text-xs rounded-xl transition flex items-center justify-center gap-1.5"
                     >
-                      📅 구글 캘린더 등록
+                      📅 구글 캘린더 앱 연동
                     </button>
                     <button 
                       onClick={() => generateCalendarICS(savedPlanData.plan, savedPlanData.goal)}
                       className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-medium text-xs rounded-xl transition flex items-center justify-center gap-1.5"
                     >
-                      🍏 애플 캘린더 등록
+                      🍏 애플 캘린더 다운
                     </button>
                   </div>
                 </div>
