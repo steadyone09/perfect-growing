@@ -29,6 +29,7 @@
 
     let supabase;
     try {
+      // persistSession은 기본값(true)으로 적용되어 로그인 세션이 로컬스토리지에 안전하게 유지됩니다.
       supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (e) {
       console.warn("Supabase 클라이언트 생성 경고:", e.message);
@@ -70,7 +71,7 @@
       return `${mins}분`;
     };
 
-    // 캘린더 알림(구글 캘린더) 딥링크 생성 헬퍼 함수
+    // 캘린더 알림(구글 캘린더) 웹 인텐트 생성 헬퍼 함수
     const generateGoogleCalendarLink = (plan, goal) => {
       try {
         const dateStr = plan.date || new Date().toISOString().split('T')[0];
@@ -93,33 +94,17 @@
         const summary = encodeURIComponent(rawSummary);
         const description = encodeURIComponent(rawDescription);
 
+        // 구글 캘린더 웹 인텐트 URL
         const webUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${summary}&details=${description}&dates=${dtStart}/${dtEnd}`;
-
-        const isAndroid = /android/i.test(navigator.userAgent);
-        const isIOS = /ipad|iphone|ipod/i.test(navigator.userAgent) && !window.MSStream;
-
-        if (isAndroid) {
-          // 안드로이드 구글 캘린더 앱 직접 호출 인텐트
-          const intentUrl = `intent://com.android.calendar/events#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event;S.title=${summary};S.description=${description};l.beginTime=${startDate.getTime()};l.endTime=${endDate.getTime()};scheme=content;package=com.google.android.calendar;S.browser_fallback_url=${encodeURIComponent(webUrl)};end;`;
-          window.location.href = intentUrl;
-        } else if (isIOS) {
-          // iOS 구글 캘린더 앱 딥링크 호출
-          const iosUrl = webUrl.replace('https://', 'googlecalendar://');
-          window.location.href = iosUrl;
-          // 미설치 시 웹 브라우저 Fallback
-          setTimeout(() => {
-            window.open(webUrl, '_blank');
-          }, 500);
-        } else {
-          // PC 환경
-          window.open(webUrl, '_blank');
-        }
+        
+        // 무조건 웹 브라우저 새 창(탭)으로 오픈
+        window.open(webUrl, '_blank');
       } catch (err) {
         console.error('구글 캘린더 링크 생성 에러:', err);
       }
     };
 
-    // 캘린더 알림(.ics) 생성 헬퍼 함수
+    // 애플 캘린더 웹 리다이렉트 (Blob URL을 새 창으로 열어 iOS 네이티브 팝업 유도)
     const generateCalendarICS = (plan, goal) => {
       try {
         const dateStr = plan.date || new Date().toISOString().split('T')[0];
@@ -166,13 +151,10 @@
           'END:VCALENDAR'
         ].join('\r\n');
 
+        // Blob 객체 생성 및 URL 추출 후 새 탭 열기 (파일 자동 다운로드를 방지하고 웹 인텐트 방식 모방)
         const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `plan_${plan.id || 'new'}.ics`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
       } catch (err) {
         console.error('ICS 생성 에러:', err);
       }
@@ -741,9 +723,17 @@
     // ==========================================
     // 6. 뷰 1: 목표 페이지
     // ==========================================
-    const GoalsView = ({ goals, onSaveGoal }) => {
+    const GoalsView = ({ goals, onSaveGoal, onToggleComplete, onDeleteGoal }) => {
       const [selectedGoal, setSelectedGoal] = React.useState(null);
       const [isModalOpen, setIsModalOpen] = React.useState(false);
+      const [goalToDelete, setGoalToDelete] = React.useState(null);
+
+      const confirmDelete = () => {
+        if (goalToDelete) {
+          onDeleteGoal(goalToDelete);
+          setGoalToDelete(null);
+        }
+      };
 
       const calculateDDay = (deadline) => {
         if (!deadline) return '';
@@ -758,6 +748,13 @@
 
       return (
         <div className="space-y-6 relative z-10">
+          <ConfirmModal
+            isOpen={!!goalToDelete}
+            message="목표를 삭제하시겠습니까? 관련 실행 계획 데이터도 함께 삭제됩니다."
+            onConfirm={confirmDelete}
+            onClose={() => setGoalToDelete(null)}
+          />
+
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-bold text-white">목표 현황</h2>
@@ -787,26 +784,50 @@
                 return (
                   <div
                     key={goal.id}
-                    onClick={() => { setSelectedGoal(goal); setIsModalOpen(true); }}
-                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 p-5 rounded-2xl cursor-pointer transition group relative flex flex-col justify-between"
+                    className={`bg-slate-900 border border-slate-800 hover:border-slate-700 p-5 rounded-2xl transition group relative flex flex-col justify-between ${goal.is_completed ? 'opacity-60' : ''}`}
                   >
                     <div>
                       <div className="flex justify-between items-start mb-3">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-orange-400 border border-orange-500/20">
-                          {goal.category}
-                        </span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                          isOverdue ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        }`}>
-                          {dDay}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onToggleComplete(goal); }}
+                            className={`flex-shrink-0 flex items-center justify-center w-5 h-5 rounded border ${goal.is_completed ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-500 text-transparent hover:border-orange-500 transition'}`}
+                            title={goal.is_completed ? "완료 취소" : "목표 완료 처리"}
+                          >
+                            <Icon name="Check" size={14} />
+                          </button>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-orange-400 border border-orange-500/20">
+                            {goal.category}
+                          </span>
+                          {goal.is_completed && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              완료됨
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                            isOverdue && !goal.is_completed ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          }`}>
+                            {dDay}
+                          </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setGoalToDelete(goal.id); }}
+                            className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition border border-transparent"
+                            title="목표 삭제"
+                          >
+                            <Icon name="Trash2" size={16} />
+                          </button>
+                        </div>
                       </div>
-                      <h3 className="font-bold text-white text-base group-hover:text-orange-400 transition mb-2">
-                        {goal.title}
-                      </h3>
+                      <div className="cursor-pointer" onClick={() => { setSelectedGoal(goal); setIsModalOpen(true); }}>
+                        <h3 className={`font-bold text-base transition mb-2 ${goal.is_completed ? 'text-slate-400 line-through' : 'text-white group-hover:text-orange-400'}`}>
+                          {goal.title}
+                        </h3>
+                      </div>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs text-slate-400">
+                    <div className="pt-4 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs text-slate-400 cursor-pointer" onClick={() => { setSelectedGoal(goal); setIsModalOpen(true); }}>
                       <span>중간 단계: {completedCount}/{milestones.length}</span>
                       <span className="text-slate-500">{goal.deadline} 까지</span>
                     </div>
@@ -913,19 +934,19 @@
                 </div>
 
                 <div className="pt-4 border-t border-slate-800">
-                  <label className="block text-xs font-medium text-slate-400 mb-2">스마트폰 캘린더 연동 (선택)</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-2">웹 기반 캘린더 연동 (새 창 열림)</label>
                   <div className="flex gap-3">
                     <button 
                       onClick={() => generateGoogleCalendarLink(savedPlanData.plan, savedPlanData.goal)}
                       className="flex-1 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-600/30 font-medium text-xs rounded-xl transition flex items-center justify-center gap-1.5"
                     >
-                      📅 구글 캘린더 앱 연동
+                      📅 구글 캘린더 등록
                     </button>
                     <button 
                       onClick={() => generateCalendarICS(savedPlanData.plan, savedPlanData.goal)}
                       className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-medium text-xs rounded-xl transition flex items-center justify-center gap-1.5"
                     >
-                      🍏 애플 캘린더 다운
+                      🍏 애플 캘린더 등록
                     </button>
                   </div>
                 </div>
@@ -1454,6 +1475,19 @@
         return saved; 
       };
 
+      const handleToggleGoalComplete = async (goal) => {
+        const updatedGoal = { ...goal, is_completed: !goal.is_completed };
+        const saved = await api.data.saveGoal(user.id, updatedGoal);
+        setGoals(prev => prev.map(g => g.id === saved.id ? saved : g));
+      };
+
+      const handleDeleteGoal = async (goalId) => {
+        await api.data.deleteGoal(goalId);
+        setGoals(prev => prev.filter(g => g.id !== goalId));
+        // 연관된 실행 계획 UI 상에서 자동 제거 (DB 레벨에서는 ON DELETE CASCADE 설정 권장)
+        setPlans(prev => prev.filter(p => p.goalId !== goalId));
+      };
+
       const handleUpdatePlan = async (plan) => {
         const saved = await api.data.savePlan(user.id, plan);
         setPlans(prev => prev.map(p => p.id === saved.id ? saved : p));
@@ -1534,7 +1568,7 @@
 
           {/* 메인 컨텐츠 */}
           <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 relative z-10 pb-20">
-            {currentTab === 'goals' && <GoalsView goals={goals} onSaveGoal={handleSaveGoal} />}
+            {currentTab === 'goals' && <GoalsView goals={goals} onSaveGoal={handleSaveGoal} onToggleComplete={handleToggleGoalComplete} onDeleteGoal={handleDeleteGoal} />}
             {currentTab === 'execution' && <ExecutionView goals={goals} onSavePlan={handleSavePlan} />}
             {currentTab === 'journal' && <JournalView plans={plans} goals={goals} onUpdatePlan={handleUpdatePlan} onDeletePlan={handleDeletePlan} />}
             {currentTab === 'stats' && <StatsView plans={plans} goals={goals} />}
