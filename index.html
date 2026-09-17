@@ -257,6 +257,8 @@
         saveHabit: async (userId, habit) => {
           if (!supabase) return habit;
           
+          console.log('저장 버튼 클릭됨 - API 전달 데이터:', habit);
+
           /* 추가된 방어 코드: INT[] 강제 변환 및 null 처리 */
           const parsedRepeatDays = (habit.repeatDays || []).map(d => parseInt(d, 10)).filter(n => !isNaN(n));
           const validTime = habit.time && habit.time.trim() !== '' ? habit.time : null;
@@ -268,27 +270,43 @@
             user_id: userId
           };
           
-          if (habit.id) {
-            const { data, error } = await supabase.from('habits').update(dbPayload).eq('id', habit.id).select();
-            if (error) console.error("saveHabit update error:", error.message, error.details, error.hint, error);
-            return data ? {
-                id: data[0].id,
-                userId: data[0].user_id,
-                title: data[0].title,
-                time: data[0].time,
-                repeatDays: data[0].repeat_days
-            } : habit;
-          } else {
-            dbPayload.id = crypto.randomUUID();
-            const { data, error } = await supabase.from('habits').insert(dbPayload).select();
-            if (error) console.error("saveHabit insert error:", error.message, error.details, error.hint, error);
-            return data ? {
-                id: data[0].id,
-                userId: data[0].user_id,
-                title: data[0].title,
-                time: data[0].time,
-                repeatDays: data[0].repeat_days
-            } : { ...habit, id: dbPayload.id, userId, repeatDays: dbPayload.repeat_days };
+          try {
+            if (habit.id) {
+              const { data, error } = await supabase.from('habits').update(dbPayload).eq('id', habit.id).select();
+              if (error) {
+                alert('저장 실패 (업데이트): ' + JSON.stringify(error));
+                console.error("saveHabit update error:", error.message, error.details, error.hint, error);
+                return null;
+              }
+              alert('저장 완료!');
+              return {
+                  id: data[0].id,
+                  userId: data[0].user_id,
+                  title: data[0].title,
+                  time: data[0].time,
+                  repeatDays: data[0].repeat_days
+              };
+            } else {
+              dbPayload.id = crypto.randomUUID();
+              const { data, error } = await supabase.from('habits').insert(dbPayload).select();
+              if (error) {
+                alert('저장 실패 (신규 추가): ' + JSON.stringify(error));
+                console.error("saveHabit insert error:", error.message, error.details, error.hint, error);
+                return null;
+              }
+              alert('저장 완료!');
+              return {
+                  id: data[0].id,
+                  userId: data[0].user_id,
+                  title: data[0].title,
+                  time: data[0].time,
+                  repeatDays: data[0].repeat_days
+              };
+            }
+          } catch (err) {
+            alert('저장 실패 (예외 발생): ' + err.message);
+            console.error("saveHabit exception:", err);
+            return null;
           }
         },
         deleteHabit: async (habitId) => {
@@ -957,10 +975,14 @@
         else setRepeatDays([...repeatDays, dayInt]);
       };
 
-      const handleSubmit = (e) => {
+      const handleSubmit = async (e) => {
         e.preventDefault();
+        console.log('폼 기본 동작(새로고침) 방지됨');
+        
         if (repeatDays.length === 0) return alert('최소 하루 이상 반복 요일을 선택해주세요.');
-        onSave({ id: habit?.id, title, time: timeStr, repeatDays });
+        
+        // 저장이 완료될 때까지 대기
+        await onSave({ id: habit?.id, title, time: timeStr, repeatDays });
         onClose();
       };
 
@@ -1263,11 +1285,13 @@
 
       const handleSaveHabit = async (habit) => {
         const saved = await api.data.saveHabit(user.id, habit);
-        setHabits(prev => {
-          const idx = prev.findIndex(h => h.id === saved.id);
-          if (idx >= 0) { const updated = [...prev]; updated[idx] = saved; return updated; }
-          return [...prev, saved];
-        });
+        if (saved) {
+          setHabits(prev => {
+            const idx = prev.findIndex(h => h.id === saved.id);
+            if (idx >= 0) { const updated = [...prev]; updated[idx] = saved; return updated; }
+            return [...prev, saved];
+          });
+        }
       };
       const handleDeleteHabit = async (habitId) => { await api.data.deleteHabit(habitId); setHabits(prev => prev.filter(h => h.id !== habitId)); };
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
