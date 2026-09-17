@@ -256,16 +256,21 @@
         },
         saveHabit: async (userId, habit) => {
           if (!supabase) return habit;
+          
+          /* 추가된 방어 코드: INT[] 강제 변환 및 null 처리 */
+          const parsedRepeatDays = (habit.repeatDays || []).map(d => parseInt(d, 10)).filter(n => !isNaN(n));
+          const validTime = habit.time && habit.time.trim() !== '' ? habit.time : null;
+
           const dbPayload = {
             title: habit.title,
-            time: habit.time,
-            repeat_days: habit.repeatDays.map(d => parseInt(d, 10)),
+            time: validTime,
+            repeat_days: parsedRepeatDays,
             user_id: userId
           };
           
           if (habit.id) {
             const { data, error } = await supabase.from('habits').update(dbPayload).eq('id', habit.id).select();
-            if (error) console.error("saveHabit update error:", error);
+            if (error) console.error("saveHabit update error:", error.message, error.details, error.hint, error);
             return data ? {
                 id: data[0].id,
                 userId: data[0].user_id,
@@ -276,7 +281,7 @@
           } else {
             dbPayload.id = crypto.randomUUID();
             const { data, error } = await supabase.from('habits').insert(dbPayload).select();
-            if (error) console.error("saveHabit insert error:", error);
+            if (error) console.error("saveHabit insert error:", error.message, error.details, error.hint, error);
             return data ? {
                 id: data[0].id,
                 userId: data[0].user_id,
@@ -970,7 +975,7 @@
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간</label>
-              <input type="time" required value={timeStr} onChange={(e) => setTimeStr(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
+              <input type="time" value={timeStr} onChange={(e) => setTimeStr(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-2">반복 요일</label>
