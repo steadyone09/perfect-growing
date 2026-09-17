@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>최강 목표 대시보드</title>
+  <title>최강 목표</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & React DOM CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone CDN (JSX 컴파일용) -->
+  <!-- Babel Standalone CDN -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -21,14 +21,19 @@
 
   <script type="text/babel">
     // ==========================================
-    // 0. Supabase 연동 설정 & 지연 함수
+    // 0. Supabase 연동 설정 & 헬퍼 함수
     // ==========================================
-    const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co"; // 실제 URL로 교체
-    const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD"; // 실제 Anon Key로 교체
+    const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD";
 
     let supabase;
     try {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+        }
+      });
     } catch (e) {
       console.warn("Supabase 클라이언트 생성 경고:", e.message);
     }
@@ -67,7 +72,7 @@
       return `${year}-${month}-${day}`;
     };
 
-    // 시간 변환 헬퍼 (분 -> 시간/분 표현)
+    // 분 단위 시간 텍스트 포맷 (오차 없는 정수 계산)
     const formatTime = (minutes) => {
       const m = parseInt(minutes, 10) || 0;
       if (m <= 0) return '0분';
@@ -78,11 +83,11 @@
       return `${mins}분`;
     };
 
-    // 캘린더 알림 웹 인텐트 헬퍼
+    // 구글 캘린더 등록 Web Intent
     const generateGoogleCalendarLink = (plan, goal) => {
       try {
-        const dateStr = plan.date || new Date().toISOString().split('T')[0];
-        const timeStr = plan.timeText || "12:00";
+        const dateStr = plan.date || getLocalYYYYMMDD(new Date());
+        const timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00"; // 기본 12:00
         const startDate = new Date(`${dateStr}T${timeStr}:00`);
         const duration = parseInt(plan.durationPlanned, 10) || 30;
         const endDate = new Date(startDate.getTime() + duration * 60000);
@@ -92,7 +97,7 @@
         const dtEnd = formatGoogleDate(endDate);
 
         const rawSummary = `[${goal?.title || '최강 목표'}] 실행 계획: ${plan.actionText}`;
-        const rawDescription = `목표 수행 행동: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 시점 메모: ' + plan.timeMemo : ''}`;
+        const rawDescription = `실행 행동: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 메모: ' + plan.timeMemo : ''}`;
         
         const summary = encodeURIComponent(rawSummary);
         const description = encodeURIComponent(rawDescription);
@@ -104,10 +109,11 @@
       }
     };
 
+    // 애플 캘린더 등록 (ICS 다운로드/실행)
     const generateCalendarICS = (plan, goal) => {
       try {
-        const dateStr = plan.date || new Date().toISOString().split('T')[0];
-        const timeStr = plan.timeText || "12:00";
+        const dateStr = plan.date || getLocalYYYYMMDD(new Date());
+        const timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
         const startDate = new Date(`${dateStr}T${timeStr}:00`);
         const duration = parseInt(plan.durationPlanned, 10) || 30;
         const endDate = new Date(startDate.getTime() + duration * 60000);
@@ -118,7 +124,7 @@
         const dtStamp = formatICSDate(new Date());
         
         const summary = `[${goal?.title || '최강 목표'}] 실행 계획: ${plan.actionText}`;
-        const description = `목표 수행 행동: ${plan.actionText}\\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\\n상세 시점 메모: ' + plan.timeMemo : ''}`;
+        const description = `실행 행동: ${plan.actionText}\\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\\n상세 메모: ' + plan.timeMemo : ''}`;
 
         const icsContent = [
           'BEGIN:VCALENDAR',
@@ -155,11 +161,11 @@
     const api = {
       auth: {
         signUp: async (email, password) => {
-          if (!supabase) return { error: null };
+          if (!supabase) return { error: { message: "Supabase 연결 오류" } };
           return await supabase.auth.signUp({ email, password, options: { data: { role: 'user' } } });
         },
         signIn: async (email, password) => {
-          if (!supabase) return { data: { user: { id: 'test-user', email, user_metadata: { role: 'user' } } }, error: null };
+          if (!supabase) return { error: { message: "Supabase 연결 오류" } };
           return await supabase.auth.signInWithPassword({ email, password });
         },
         signOut: async () => {
@@ -167,16 +173,29 @@
           return await supabase.auth.signOut();
         },
         resetPassword: async (email) => {
-          if (!supabase) return { error: null };
+          if (!supabase) return { error: { message: "Supabase 연결 오류" } };
           return await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
         },
         updatePassword: async (newPassword) => {
-          if (!supabase) return { error: null };
+          if (!supabase) return { error: { message: "Supabase 연결 오류" } };
           return await supabase.auth.updateUser({ password: newPassword });
         },
         getUser: async () => {
           if (!supabase) return null;
-          const { data } = await supabase.auth.getUser();
+          
+          // 1. 로컬 세션을 먼저 확인하여 로그인 안 된 사용자의 불필요한 'Auth session missing!' 에러 방지
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (!sessionData?.session) return null;
+          
+          // 2. 세션이 있을 때만 서버에서 유저 정보 검증
+          const { data, error } = await supabase.auth.getUser();
+          if (error) {
+            // 예상치 못한 실제 에러만 콘솔에 출력
+            if (error.name !== 'AuthSessionMissingError' && error.message !== 'Auth session missing!') {
+              console.error("GetUser Error:", error);
+            }
+            return null;
+          }
           return data?.user || null;
         }
       },
@@ -184,76 +203,93 @@
         getGoals: async (userId) => {
           if (!supabase) return [];
           const { data, error } = await supabase.from('goals').select('*').eq('userId', userId);
+          if (error) console.error("getGoals error:", error);
           return data || [];
         },
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
           if (goal.id) {
-            const { data } = await supabase.from('goals').update(goal).eq('id', goal.id).select();
+            const { data, error } = await supabase.from('goals').update(goal).eq('id', goal.id).select();
+            if (error) console.error(error);
             return data ? data[0] : goal;
           } else {
             const newGoal = { ...goal, userId, id: crypto.randomUUID() };
-            const { data } = await supabase.from('goals').insert(newGoal).select();
+            const { data, error } = await supabase.from('goals').insert(newGoal).select();
+            if (error) console.error(error);
             return data ? data[0] : newGoal;
           }
         },
         deleteGoal: async (goalId) => {
           if (!supabase) return;
-          await supabase.from('goals').delete().eq('id', goalId);
+          const { error } = await supabase.from('goals').delete().eq('id', goalId);
+          if (error) console.error(error);
         },
         getPlans: async (userId) => {
           if (!supabase) return [];
-          const { data } = await supabase.from('plans').select('*').eq('userId', userId);
+          const { data, error } = await supabase.from('plans').select('*').eq('userId', userId);
+          if (error) console.error("getPlans error:", error);
           return data || [];
         },
         savePlan: async (userId, plan) => {
           if (!supabase) return plan;
           if (plan.id) {
-            const { data } = await supabase.from('plans').update(plan).eq('id', plan.id).select();
+            const { data, error } = await supabase.from('plans').update(plan).eq('id', plan.id).select();
+            if (error) console.error(error);
             return data ? data[0] : plan;
           } else {
             const newPlan = { ...plan, userId, id: crypto.randomUUID() };
-            const { data } = await supabase.from('plans').insert(newPlan).select();
+            const { data, error } = await supabase.from('plans').insert(newPlan).select();
+            if (error) console.error(error);
             return data ? data[0] : newPlan;
           }
         },
         deletePlan: async (planId) => {
           if (!supabase) return;
-          await supabase.from('plans').delete().eq('id', planId);
+          const { error } = await supabase.from('plans').delete().eq('id', planId);
+          if (error) console.error(error);
         },
         getHabits: async (userId) => {
           if (!supabase) return [];
-          const { data } = await supabase.from('habits').select('*').eq('userId', userId);
+          const { data, error } = await supabase.from('habits').select('*').eq('userId', userId);
+          if (error) console.error("getHabits error:", error);
           return data || [];
         },
         saveHabit: async (userId, habit) => {
           if (!supabase) return habit;
           if (habit.id) {
-            const { data } = await supabase.from('habits').update(habit).eq('id', habit.id).select();
+            const { data, error } = await supabase.from('habits').update(habit).eq('id', habit.id).select();
+            if (error) console.error(error);
             return data ? data[0] : habit;
           } else {
             const newHabit = { ...habit, userId, id: crypto.randomUUID() };
-            const { data } = await supabase.from('habits').insert(newHabit).select();
+            const { data, error } = await supabase.from('habits').insert(newHabit).select();
+            if (error) console.error(error);
             return data ? data[0] : newHabit;
           }
         },
         deleteHabit: async (habitId) => {
           if (!supabase) return;
-          await supabase.from('habits').delete().eq('id', habitId);
+          const { error } = await supabase.from('habits').delete().eq('id', habitId);
+          if (error) console.error(error);
         },
         getHabitLogs: async (userId) => {
           if (!supabase) return [];
-          const { data } = await supabase.from('habit_logs').select('*').eq('userId', userId);
+          const { data, error } = await supabase.from('habit_logs').select('*').eq('userId', userId);
+          if (error) console.error("getHabitLogs error:", error);
           return data || [];
         },
         toggleHabitLog: async (userId, habitId, date, isCompleted) => {
           if (!supabase) return { id: crypto.randomUUID(), habitId, userId, date };
           if (isCompleted) {
-            await supabase.from('habit_logs').delete().match({ habitId, date, userId });
-            return null; // Deleted
+            // Already completed, so remove it
+            const { error } = await supabase.from('habit_logs').delete().match({ habitId, date, userId });
+            if (error) console.error(error);
+            return null;
           } else {
+            // Not completed, so insert it
             const newLog = { id: crypto.randomUUID(), habitId, userId, date };
-            const { data } = await supabase.from('habit_logs').insert(newLog).select();
+            const { data, error } = await supabase.from('habit_logs').insert(newLog).select();
+            if (error) console.error(error);
             return data ? data[0] : newLog;
           }
         },
@@ -268,7 +304,7 @@
     };
 
     // ==========================================
-    // 2. 공통 UI 컴포넌트 (모달 및 팝업)
+    // 2. 공통 커스텀 모달 컴포넌트
     // ==========================================
     const CustomModal = ({ isOpen, title, children, onClose }) => {
       if (!isOpen) return null;
@@ -302,7 +338,7 @@
     );
 
     // ==========================================
-    // 3. 비밀번호 재설정 모달
+    // 3. 인증 화면 (로그인 / 비밀번호 재설정 모달)
     // ==========================================
     const ResetPasswordModal = ({ isOpen, onClose }) => {
       const [newPassword, setNewPassword] = React.useState('');
@@ -356,9 +392,6 @@
       );
     };
 
-    // ==========================================
-    // 4. 인증 화면 (로그인 / 회원가입)
-    // ==========================================
     const AuthView = ({ onLoginSuccess }) => {
       const [isSignUp, setIsSignUp] = React.useState(false);
       const [isForgotPassword, setIsForgotPassword] = React.useState(false);
@@ -463,7 +496,7 @@
     };
 
     // ==========================================
-    // 5. 목표 폼 모달 (중간 단계)
+    // 4. 뷰 1: 목표 페이지 (폼 및 목록)
     // ==========================================
     const GoalFormModal = ({ isOpen, onClose, onSave, goal }) => {
       const [title, setTitle] = React.useState('');
@@ -474,15 +507,10 @@
 
       React.useEffect(() => {
         if (goal) {
-          setTitle(goal.title || '');
-          setCategory(goal.category || '커리어');
-          setDeadline(goal.deadline || '');
-          setMilestones(goal.milestones || []);
+          setTitle(goal.title || ''); setCategory(goal.category || '커리어');
+          setDeadline(goal.deadline || ''); setMilestones(goal.milestones || []);
         } else {
-          setTitle('');
-          setCategory('커리어');
-          setDeadline('');
-          setMilestones([]);
+          setTitle(''); setCategory('커리어'); setDeadline(''); setMilestones([]);
         }
       }, [goal, isOpen]);
 
@@ -530,7 +558,6 @@
                 <input type="date" required value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
               </div>
             </div>
-
             <div className="pt-4 border-t border-slate-800">
               <div className="flex justify-between items-center mb-3">
                 <label className="text-sm font-semibold text-white">중간 단계 (순서 변경 가능)</label>
@@ -560,9 +587,6 @@
       );
     };
 
-    // ==========================================
-    // 6. 뷰 1: 목표 페이지
-    // ==========================================
     const GoalsView = ({ goals, onSaveGoal, onToggleComplete, onDeleteGoal }) => {
       const [selectedGoal, setSelectedGoal] = React.useState(null);
       const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -641,7 +665,7 @@
     };
 
     // ==========================================
-    // 7. 뷰 2: 계획 페이지 (대화형 마법사 & 캘린더)
+    // 5. 뷰 2: 계획 페이지 (대화형 마법사)
     // ==========================================
     const ExecutionView = ({ goals, onSavePlan }) => {
       const [step, setStep] = React.useState(1);
@@ -807,7 +831,7 @@
     };
 
     // ==========================================
-    // 8. 뷰 3: 실행 목록 일지
+    // 6. 뷰 3: 실행 일지 
     // ==========================================
     const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan }) => {
       const [planToDelete, setPlanToDelete] = React.useState(null);
@@ -876,18 +900,18 @@
     };
 
     // ==========================================
-    // 9. 뷰 4: 습관 관리 페이지 (신규)
+    // 7. 뷰 4: 습관 관리 페이지
     // ==========================================
     const HabitFormModal = ({ isOpen, onClose, onSave, habit }) => {
       const [title, setTitle] = React.useState('');
       const [timeStr, setTimeStr] = React.useState('09:00');
-      const [repeatDays, setRepeatDays] = React.useState([]); // 0(Sun) - 6(Sat)
+      const [repeatDays, setRepeatDays] = React.useState([]);
 
       React.useEffect(() => {
         if (habit) {
           setTitle(habit.title || ''); setTimeStr(habit.time || '09:00'); setRepeatDays(habit.repeatDays || []);
         } else {
-          setTitle(''); setTimeStr('09:00'); setRepeatDays([1,2,3,4,5]); // Default Weekdays
+          setTitle(''); setTimeStr('09:00'); setRepeatDays([1,2,3,4,5]); 
         }
       }, [habit, isOpen]);
 
@@ -943,11 +967,10 @@
       const [editingHabit, setEditingHabit] = React.useState(null);
       const [habitToDelete, setHabitToDelete] = React.useState(null);
 
-      // Create Current Week Array (Mon-Sun)
       const weekDates = React.useMemo(() => {
         const d = new Date();
         const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust to Monday
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
         d.setDate(diff);
         const dates = [];
         for (let i = 0; i < 7; i++) {
@@ -960,19 +983,14 @@
       const dayLabels = ['일', '월', '화', '수', '목', '금', '토'];
       const selectedDateStr = getLocalYYYYMMDD(selectedDateObj);
       const selectedDayInt = selectedDateObj.getDay();
-
-      // Get habits scheduled for the selected day
       const dailyHabits = habits.filter(h => h.repeatDays && h.repeatDays.includes(selectedDayInt));
 
-      // 7-day stats calculator
       const getLast7ExpectedDates = (habit) => {
         const dates = [];
-        const curr = new Date(selectedDateObj); // anchor to current selected date
+        const curr = new Date(selectedDateObj);
         let iters = 0;
-        while(dates.length < 7 && iters < 60) { // max 60 days lookback safe guard
-          if (habit.repeatDays.includes(curr.getDay())) {
-            dates.unshift(getLocalYYYYMMDD(curr)); // oldest first
-          }
+        while(dates.length < 7 && iters < 60) { 
+          if (habit.repeatDays.includes(curr.getDay())) dates.unshift(getLocalYYYYMMDD(curr));
           curr.setDate(curr.getDate() - 1);
           iters++;
         }
@@ -983,7 +1001,7 @@
 
       return (
         <div className="space-y-6 relative z-10">
-          <ConfirmModal isOpen={!!habitToDelete} message="습관을 삭제하시겠습니까? 누적된 달성 기록도 사라집니다." onConfirm={confirmDelete} onClose={() => setHabitToDelete(null)} />
+          <ConfirmModal isOpen={!!habitToDelete} message="습관을 삭제하시겠습니까? 누적된 달성 기록도 함께 사라집니다." onConfirm={confirmDelete} onClose={() => setHabitToDelete(null)} />
           
           <div className="flex justify-between items-center">
             <div>
@@ -995,7 +1013,6 @@
             </button>
           </div>
 
-          {/* Week Selector */}
           <div className="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-2xl p-2">
             {weekDates.map(d => {
               const isSelected = getLocalYYYYMMDD(d) === selectedDateStr;
@@ -1052,14 +1069,13 @@
               })
             )}
           </div>
-
           <HabitFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={onSaveHabit} habit={editingHabit} />
         </div>
       );
     };
 
     // ==========================================
-    // 10. 뷰 5: 통계 리포트
+    // 8. 뷰 5: 통계 리포트
     // ==========================================
     const StatsView = ({ plans, goals }) => {
       const [filter, setFilter] = React.useState('weekly');
@@ -1090,7 +1106,7 @@
     };
 
     // ==========================================
-    // 11. 뷰 6: 관리자 전용 대시보드
+    // 9. 뷰 6: 관리자 전용 대시보드
     // ==========================================
     const AdminView = () => {
       const [adminData, setAdminData] = React.useState({ users: [], goals: [], plans: [] });
@@ -1109,11 +1125,13 @@
     };
 
     // ==========================================
-    // 12. 메인 App 컴포넌트
+    // 10. 메인 App 컴포넌트
     // ==========================================
     const App = () => {
       const [user, setUser] = React.useState(null);
       const [currentTab, setCurrentTab] = React.useState('goals');
+      const [isLoading, setIsLoading] = React.useState(true);
+      
       const [goals, setGoals] = React.useState([]);
       const [plans, setPlans] = React.useState([]);
       const [habits, setHabits] = React.useState([]);
@@ -1131,14 +1149,25 @@
       }, []);
 
       React.useEffect(() => {
-        api.auth.getUser().then(u => { if (u) { setUser(u); loadUserData(u.id); } });
+        const initAuth = async () => {
+          const u = await api.auth.getUser();
+          if (u) {
+            setUser(u);
+            await loadUserData(u.id);
+          } else {
+            setIsLoading(false);
+          }
+        };
+        initAuth();
       }, []);
 
       const loadUserData = async (userId) => {
+        setIsLoading(true);
         const [userGoals, userPlans, userHabits, userHabitLogs] = await Promise.all([
           api.data.getGoals(userId), api.data.getPlans(userId), api.data.getHabits(userId), api.data.getHabitLogs(userId)
         ]);
         setGoals(userGoals); setPlans(userPlans); setHabits(userHabits); setHabitLogs(userHabitLogs);
+        setIsLoading(false);
       };
 
       const handleSaveGoal = async (goal) => {
@@ -1162,7 +1191,6 @@
       const handleUpdatePlan = async (plan) => { const saved = await api.data.savePlan(user.id, plan); setPlans(prev => prev.map(p => p.id === saved.id ? saved : p)); };
       const handleDeletePlan = async (planId) => { await api.data.deletePlan(planId); setPlans(prev => prev.filter(p => p.id !== planId)); };
 
-      // Habit Handlers
       const handleSaveHabit = async (habit) => {
         const saved = await api.data.saveHabit(user.id, habit);
         setHabits(prev => {
@@ -1174,14 +1202,22 @@
       const handleDeleteHabit = async (habitId) => { await api.data.deleteHabit(habitId); setHabits(prev => prev.filter(h => h.id !== habitId)); };
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
         const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
-        if (isCompleted) { // Removed
-          setHabitLogs(prev => prev.filter(log => !(log.habitId === habitId && log.date === dateStr)));
-        } else if (result) { // Added
-          setHabitLogs(prev => [...prev, result]);
-        }
+        if (isCompleted) setHabitLogs(prev => prev.filter(log => !(log.habitId === habitId && log.date === dateStr)));
+        else if (result) setHabitLogs(prev => [...prev, result]);
       };
 
-      if (!user) return <><AuthView onLoginSuccess={(u) => { setUser(u); loadUserData(u.id); }} /><ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} /></>;
+      if (isLoading) {
+        return (
+          <div className="min-h-screen bg-black flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+               <Icon name="Loader2" className="animate-spin text-orange-500" size={40} />
+               <p className="text-sm font-semibold text-orange-500">데이터를 불러오는 중입니다...</p>
+            </div>
+          </div>
+        );
+      }
+
+      if (!user) return <><AuthView onLoginSuccess={async (u) => { setUser(u); await loadUserData(u.id); }} /><ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} /></>;
 
       const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'admin@test.com';
 
