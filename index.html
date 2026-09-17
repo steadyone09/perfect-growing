@@ -241,31 +241,32 @@
           const { error } = await supabase.from('plans').delete().eq('id', planId);
           if (error) console.error("deletePlan error:", error);
         },
-        // Habit 테이블 통신 시 user_id 및 repeat_days 등 Snake Case 완벽 매핑
         getHabits: async (userId) => {
           if (!supabase) return [];
           const { data, error } = await supabase.from('habits').select('*').eq('user_id', userId);
           if (error) { console.error("getHabits error:", error); return []; }
+          // exec_time 컬럼을 프론트엔드의 time 필드로 맵핑
           return data.map(d => ({
             id: d.id,
             userId: d.user_id,
             title: d.title,
-            time: d.time,
+            time: d.exec_time,
             repeatDays: d.repeat_days || []
           }));
         },
         saveHabit: async (userId, habit) => {
           if (!supabase) return habit;
           
-          console.log('저장 버튼 클릭됨 - API 전달 데이터:', habit);
+          console.log('API saveHabit 호출됨 - 원본 데이터:', habit);
 
-          /* 추가된 방어 코드: INT[] 강제 변환 및 null 처리 */
+          // 정수 배열 강제 변환
           const parsedRepeatDays = (habit.repeatDays || []).map(d => parseInt(d, 10)).filter(n => !isNaN(n));
           const validTime = habit.time && habit.time.trim() !== '' ? habit.time : null;
 
+          // DB payload 작성 - DB 컬럼명 exec_time 준수
           const dbPayload = {
             title: habit.title,
-            time: validTime,
+            exec_time: validTime,
             repeat_days: parsedRepeatDays,
             user_id: userId
           };
@@ -278,12 +279,12 @@
                 console.error("saveHabit update error:", error.message, error.details, error.hint, error);
                 return null;
               }
-              alert('저장 완료!');
+              alert('습관이 성공적으로 수정되었습니다!');
               return {
                   id: data[0].id,
                   userId: data[0].user_id,
                   title: data[0].title,
-                  time: data[0].time,
+                  time: data[0].exec_time,
                   repeatDays: data[0].repeat_days
               };
             } else {
@@ -294,12 +295,12 @@
                 console.error("saveHabit insert error:", error.message, error.details, error.hint, error);
                 return null;
               }
-              alert('저장 완료!');
+              alert('새로운 습관이 등록되었습니다!');
               return {
                   id: data[0].id,
                   userId: data[0].user_id,
                   title: data[0].title,
-                  time: data[0].time,
+                  time: data[0].exec_time,
                   repeatDays: data[0].repeat_days
               };
             }
@@ -328,14 +329,12 @@
         toggleHabitLog: async (userId, habitId, dateStr, isCompleted) => {
           if (!supabase) return null;
           if (isCompleted) {
-            // Already completed, so remove it
             const { error } = await supabase.from('habit_logs')
               .delete()
               .match({ habit_id: habitId, date: dateStr, user_id: userId });
             if (error) console.error("toggleHabitLog delete error:", error);
             return null;
           } else {
-            // Not completed, so insert it
             const newLog = { id: crypto.randomUUID(), habit_id: habitId, user_id: userId, date: dateStr };
             const { data, error } = await supabase.from('habit_logs').insert(newLog).select();
             if (error) console.error("toggleHabitLog insert error:", error);
@@ -934,7 +933,7 @@
                       <div>
                         <label className="text-slate-400 block mb-1">달성 여부</label>
                         <button onClick={() => onUpdatePlan({ ...plan, status: isCompleted ? 'planned' : 'completed' })} className={`w-full py-1.5 rounded font-semibold text-xs border transition ${isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
-                          {isCompleted ? '✓ 완료됨' : '미완료 (클릭)'}
+                          {isCompleted ? '✓ 완료' : '미달성 (클릭)'}
                         </button>
                       </div>
                     </div>
@@ -976,14 +975,19 @@
       };
 
       const handleSubmit = async (e) => {
-        e.preventDefault();
-        console.log('폼 기본 동작(새로고침) 방지됨');
+        // 엔터 혹은 저장하기 클릭 시 무조건 폼 기본 동작 방지
+        if (e) e.preventDefault(); 
         
-        if (repeatDays.length === 0) return alert('최소 하루 이상 반복 요일을 선택해주세요.');
+        console.log('폼 전송 이벤트 감지됨 (새로고침 방지)');
+        
+        if (repeatDays.length === 0) {
+          alert('최소 하루 이상 반복 요일을 선택해주세요.');
+          return;
+        }
         
         // 저장이 완료될 때까지 대기
         await onSave({ id: habit?.id, title, time: timeStr, repeatDays });
-        onClose();
+        onClose(); // 저장 로직 수행 후 모달 닫기
       };
 
       const dayLabels = [{v:1, l:'월'}, {v:2, l:'화'}, {v:3, l:'수'}, {v:4, l:'목'}, {v:5, l:'금'}, {v:6, l:'토'}, {v:0, l:'일'}];
@@ -1011,7 +1015,7 @@
             </div>
             <div className="pt-2 flex justify-end gap-2">
               <button type="button" onClick={onClose} className="px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-xl">취소</button>
-              <button type="submit" className="px-4 py-2.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-xl shadow-lg shadow-orange-600/20">저장하기</button>
+              <button type="button" onClick={handleSubmit} className="px-4 py-2.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-xl shadow-lg shadow-orange-600/20">저장하기</button>
             </div>
           </form>
         </CustomModal>
@@ -1187,7 +1191,7 @@
     const App = () => {
       const [user, setUser] = React.useState(null);
       const [currentTab, setCurrentTab] = React.useState('goals');
-      const [isLoading, setIsLoading] = React.useState(true); // 초기 로딩 상태 방어용
+      const [isLoading, setIsLoading] = React.useState(true);
       
       const [goals, setGoals] = React.useState([]);
       const [plans, setPlans] = React.useState([]);
@@ -1205,10 +1209,8 @@
         return () => window.removeEventListener('hashchange', handleHashChange);
       }, []);
 
-      // 인증 세션 리스너 등록 및 데이터 Fetch (새로고침/재접속 Persistence 강화)
       React.useEffect(() => {
         let mounted = true;
-        
         const initAuth = async () => {
           const u = await api.auth.getUser();
           if (u && mounted) {
@@ -1286,13 +1288,12 @@
       const handleSaveHabit = async (habit) => {
         const saved = await api.data.saveHabit(user.id, habit);
         if (saved) {
-          setHabits(prev => {
-            const idx = prev.findIndex(h => h.id === saved.id);
-            if (idx >= 0) { const updated = [...prev]; updated[idx] = saved; return updated; }
-            return [...prev, saved];
-          });
+          // 저장 후 DB에서 습관 리스트를 재조회(refetch)하여 완벽 동기화 보장
+          const refreshedHabits = await api.data.getHabits(user.id);
+          setHabits(refreshedHabits);
         }
       };
+      
       const handleDeleteHabit = async (habitId) => { await api.data.deleteHabit(habitId); setHabits(prev => prev.filter(h => h.id !== habitId)); };
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
         const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
