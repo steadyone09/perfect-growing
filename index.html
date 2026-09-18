@@ -63,12 +63,16 @@
       return <span ref={spanRef} className={`inline-flex items-center justify-center ${className}`} />;
     };
 
-    // 로컬 타임존 기준 YYYY-MM-DD 포맷 반환
-    const getLocalYYYYMMDD = (date) => {
-      const d = new Date(date);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
+    // 한국 시간(KST) 기준 YYYY-MM-DD 포맷 반환 (타임존 오차 방지)
+    const getKSTYYYYMMDD = (dateVal) => {
+      const d = new Date(dateVal);
+      // 현재 Date의 UTC 시간 확보
+      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+      // KST(UTC+9)로 변환
+      const kstDate = new Date(utc + (9 * 3600000));
+      const year = kstDate.getFullYear();
+      const month = String(kstDate.getMonth() + 1).padStart(2, '0');
+      const day = String(kstDate.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     };
 
@@ -86,7 +90,7 @@
     // 구글 캘린더 Web Intent
     const generateGoogleCalendarLink = (plan, goal) => {
       try {
-        const dateStr = plan.date || getLocalYYYYMMDD(new Date());
+        const dateStr = plan.date || getKSTYYYYMMDD(new Date());
         const timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
         const startDate = new Date(`${dateStr}T${timeStr}:00`);
         const duration = parseInt(plan.durationPlanned, 10) || 30;
@@ -109,7 +113,7 @@
     // 애플 캘린더 Web Intent (.ics)
     const generateCalendarICS = (plan, goal) => {
       try {
-        const dateStr = plan.date || getLocalYYYYMMDD(new Date());
+        const dateStr = plan.date || getKSTYYYYMMDD(new Date());
         const timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
         const startDate = new Date(`${dateStr}T${timeStr}:00`);
         const duration = parseInt(plan.durationPlanned, 10) || 30;
@@ -333,34 +337,19 @@
           if (!supabase) return null;
           try {
             if (isCompleted) {
-              // 체크 해제 (삭제)
-              let { error } = await supabase.from('habit_logs')
+              // 체크 해제 (삭제) - date 대신 completed_date 사용
+              const { error } = await supabase.from('habit_logs')
                 .delete()
-                .match({ habit_id: habitId, date: dateStr, user_id: userId });
+                .match({ habit_id: habitId, completed_date: dateStr, user_id: userId });
               
-              if (error && error.code === 'PGRST204') {
-                 // date 컬럼이 없는 경우 completed_date 로 2차 시도
-                 const { error: e2 } = await supabase.from('habit_logs')
-                   .delete()
-                   .match({ habit_id: habitId, completed_date: dateStr, user_id: userId });
-                 if (e2) throw e2;
-              } else if (error) {
-                 throw error;
-              }
+              if (error) throw error;
               return { success: true, action: 'deleted' };
             } else {
-              // 체크 (생성)
-              const newLog = { habit_id: habitId, user_id: userId, date: dateStr, is_completed: true };
-              let { error } = await supabase.from('habit_logs').insert(newLog);
+              // 체크 (생성) - date 대신 completed_date 사용
+              const newLog = { habit_id: habitId, user_id: userId, completed_date: dateStr, is_completed: true };
+              const { error } = await supabase.from('habit_logs').insert(newLog);
               
-              if (error && error.code === 'PGRST204') {
-                 // date 컬럼이 없는 경우 completed_date 로 2차 시도
-                 const fallbackLog = { habit_id: habitId, user_id: userId, completed_date: dateStr, is_completed: true };
-                 const { error: e2 } = await supabase.from('habit_logs').insert(fallbackLog);
-                 if (e2) throw e2;
-              } else if (error) {
-                 throw error;
-              }
+              if (error) throw error;
               return { success: true, action: 'inserted' };
             }
           } catch (err) {
@@ -760,7 +749,7 @@
 
       const handleComplete = async () => {
         const newPlan = {
-          date: getLocalYYYYMMDD(new Date()),
+          date: getKSTYYYYMMDD(new Date()),
           goalId: selectedGoalId,
           milestoneId: selectedMilestoneId,
           actionText,
@@ -1062,7 +1051,8 @@
       }, []);
 
       const dayLabels = ['일', '월', '화', '수', '목', '금', '토'];
-      const selectedDateStr = getLocalYYYYMMDD(selectedDateObj);
+      // KST 기반의 정확한 YYYY-MM-DD 스트링 획득
+      const selectedDateStr = getKSTYYYYMMDD(selectedDateObj);
       const selectedDayInt = selectedDateObj.getDay();
       const dailyHabits = habits.filter(h => h.repeatDays && h.repeatDays.includes(selectedDayInt));
 
@@ -1071,7 +1061,7 @@
         const curr = new Date(selectedDateObj);
         let iters = 0;
         while(dates.length < 7 && iters < 60) { 
-          if (habit.repeatDays.includes(curr.getDay())) dates.unshift(getLocalYYYYMMDD(curr));
+          if (habit.repeatDays.includes(curr.getDay())) dates.unshift(getKSTYYYYMMDD(curr));
           curr.setDate(curr.getDate() - 1);
           iters++;
         }
@@ -1096,8 +1086,8 @@
 
           <div className="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-2xl p-2">
             {weekDates.map(d => {
-              const isSelected = getLocalYYYYMMDD(d) === selectedDateStr;
-              const isToday = getLocalYYYYMMDD(d) === getLocalYYYYMMDD(new Date());
+              const isSelected = getKSTYYYYMMDD(d) === selectedDateStr;
+              const isToday = getKSTYYYYMMDD(d) === getKSTYYYYMMDD(new Date());
               return (
                 <button key={d.toISOString()} onClick={() => setSelectedDateObj(new Date(d))} className={`flex flex-col items-center p-2 rounded-xl min-w-[3rem] transition ${isSelected ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                   <span className="text-[10px] mb-1">{dayLabels[d.getDay()]}</span>
@@ -1317,7 +1307,9 @@
       
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
         const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
-        if (result && !result.error) {
+        if (result && result.error) {
+           alert('체크 저장 실패: ' + (result.error.message || JSON.stringify(result.error)));
+        } else {
            // DB 동기화 완료 후 즉각 re-fetch 하여 UI Persistence 보장
            const refreshedLogs = await api.data.getHabitLogs(user.id);
            setHabitLogs(refreshedLogs || []);
