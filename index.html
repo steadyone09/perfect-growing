@@ -257,8 +257,6 @@
         saveHabit: async (userId, habit) => {
           if (!supabase) return habit;
           
-          console.log('API saveHabit 호출됨 - 원본 데이터:', habit);
-
           // 정수 배열 강제 변환
           const parsedRepeatDays = (habit.repeatDays || []).map(d => parseInt(d, 10)).filter(n => !isNaN(n));
           const validTime = habit.time && habit.time.trim() !== '' ? habit.time : null;
@@ -317,32 +315,58 @@
         },
         getHabitLogs: async (userId) => {
           if (!supabase) return [];
-          const { data, error } = await supabase.from('habit_logs').select('*').eq('user_id', userId);
-          if (error) { console.error("getHabitLogs error:", error); return []; }
-          return data.map(d => ({
-            id: d.id,
-            habitId: d.habit_id,
-            userId: d.user_id,
-            date: d.date
-          }));
+          try {
+            const { data, error } = await supabase.from('habit_logs').select('*').eq('user_id', userId);
+            if (error) { console.error("getHabitLogs error:", error); return []; }
+            return data.map(d => ({
+              id: d.id,
+              habitId: d.habit_id,
+              userId: d.user_id,
+              date: d.date || d.completed_date // 두 컬럼 가능성 모두 대응
+            }));
+          } catch (err) {
+             console.error("getHabitLogs exception:", err);
+             return [];
+          }
         },
         toggleHabitLog: async (userId, habitId, dateStr, isCompleted) => {
           if (!supabase) return null;
-          if (isCompleted) {
-            const { error } = await supabase.from('habit_logs')
-              .delete()
-              .match({ habit_id: habitId, date: dateStr, user_id: userId });
-            if (error) console.error("toggleHabitLog delete error:", error);
-            return null;
-          } else {
-            const newLog = { id: crypto.randomUUID(), habit_id: habitId, user_id: userId, date: dateStr };
-            const { data, error } = await supabase.from('habit_logs').insert(newLog).select();
-            if (error) console.error("toggleHabitLog insert error:", error);
-            return data ? {
-              id: data[0].id, habitId: data[0].habit_id, userId: data[0].user_id, date: data[0].date
-            } : {
-              id: newLog.id, habitId: habitId, userId: userId, date: dateStr
-            };
+          try {
+            if (isCompleted) {
+              // 체크 해제 (삭제)
+              let { error } = await supabase.from('habit_logs')
+                .delete()
+                .match({ habit_id: habitId, date: dateStr, user_id: userId });
+              
+              if (error && error.code === 'PGRST204') {
+                 // date 컬럼이 없는 경우 completed_date 로 2차 시도
+                 const { error: e2 } = await supabase.from('habit_logs')
+                   .delete()
+                   .match({ habit_id: habitId, completed_date: dateStr, user_id: userId });
+                 if (e2) throw e2;
+              } else if (error) {
+                 throw error;
+              }
+              return { success: true, action: 'deleted' };
+            } else {
+              // 체크 (생성)
+              const newLog = { habit_id: habitId, user_id: userId, date: dateStr, is_completed: true };
+              let { error } = await supabase.from('habit_logs').insert(newLog);
+              
+              if (error && error.code === 'PGRST204') {
+                 // date 컬럼이 없는 경우 completed_date 로 2차 시도
+                 const fallbackLog = { habit_id: habitId, user_id: userId, completed_date: dateStr, is_completed: true };
+                 const { error: e2 } = await supabase.from('habit_logs').insert(fallbackLog);
+                 if (e2) throw e2;
+              } else if (error) {
+                 throw error;
+              }
+              return { success: true, action: 'inserted' };
+            }
+          } catch (err) {
+            alert('기록 동기화 실패: ' + (err.message || JSON.stringify(err)));
+            console.error("toggleHabitLog exception:", err);
+            return { error: err };
           }
         },
         getAllAdminData: async () => {
@@ -468,12 +492,12 @@
         }
 
         if (isSignUp) {
-          if (!privacyAgreed) return setMessage({ type: 'error', text: '개인정보 동의는 필수입니다.' });
+          if (!privacyAgreed) return setMessage({ type: 'error', text: '개인정보 처리 동의는 필수입니다.' });
           setLoading(true);
           await delay(500);
           const { error } = await api.auth.signUp(email, password);
           setLoading(false);
-          if (error) setMessage({ type: 'error', text: error.message || '회원가입 오류' });
+          if (error) setMessage({ type: 'error', text: error.message || '회원가입 중 오류 발생' });
           else {
             setMessage({ type: 'success', text: '회원가입 완료! 로그인해 주세요.' });
             setIsSignUp(false);
@@ -975,19 +999,15 @@
       };
 
       const handleSubmit = async (e) => {
-        // 엔터 혹은 저장하기 클릭 시 무조건 폼 기본 동작 방지
         if (e) e.preventDefault(); 
-        
-        console.log('폼 전송 이벤트 감지됨 (새로고침 방지)');
         
         if (repeatDays.length === 0) {
           alert('최소 하루 이상 반복 요일을 선택해주세요.');
           return;
         }
         
-        // 저장이 완료될 때까지 대기
         await onSave({ id: habit?.id, title, time: timeStr, repeatDays });
-        onClose(); // 저장 로직 수행 후 모달 닫기
+        onClose();
       };
 
       const dayLabels = [{v:1, l:'월'}, {v:2, l:'화'}, {v:3, l:'수'}, {v:4, l:'목'}, {v:5, l:'금'}, {v:6, l:'토'}, {v:0, l:'일'}];
@@ -1253,10 +1273,10 @@
             api.data.getHabits(userId),
             api.data.getHabitLogs(userId)
           ]);
-          setGoals(userGoals);
-          setPlans(userPlans);
-          setHabits(userHabits);
-          setHabitLogs(userHabitLogs);
+          setGoals(userGoals || []);
+          setPlans(userPlans || []);
+          setHabits(userHabits || []);
+          setHabitLogs(userHabitLogs || []);
         } catch (e) {
           console.error("데이터 로딩 중 에러:", e);
         } finally {
@@ -1288,19 +1308,19 @@
       const handleSaveHabit = async (habit) => {
         const saved = await api.data.saveHabit(user.id, habit);
         if (saved) {
-          // 저장 후 DB에서 습관 리스트를 재조회(refetch)하여 완벽 동기화 보장
           const refreshedHabits = await api.data.getHabits(user.id);
-          setHabits(refreshedHabits);
+          setHabits(refreshedHabits || []);
         }
       };
       
       const handleDeleteHabit = async (habitId) => { await api.data.deleteHabit(habitId); setHabits(prev => prev.filter(h => h.id !== habitId)); };
+      
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
         const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
-        if (isCompleted) {
-           setHabitLogs(prev => prev.filter(log => !(log.habitId === habitId && log.date === dateStr)));
-        } else if (result) {
-           setHabitLogs(prev => [...prev, result]);
+        if (result && !result.error) {
+           // DB 동기화 완료 후 즉각 re-fetch 하여 UI Persistence 보장
+           const refreshedLogs = await api.data.getHabitLogs(user.id);
+           setHabitLogs(refreshedLogs || []);
         }
       };
 
