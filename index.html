@@ -1309,7 +1309,6 @@
             api.data.getHabits(userId),
             api.data.getHabitLogs(userId)
           ]);
-          // 에러 시 null이 반환되므로 상태를 덮어쓰지 않음
           if (userGoals !== null) setGoals(userGoals);
           if (userPlans !== null) setPlans(userPlans);
           if (userHabits !== null) setHabits(userHabits);
