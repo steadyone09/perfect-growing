@@ -37,17 +37,6 @@
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // XSS 방어 (Sanitization Helper - 강화됨)
-    const sanitize = (str) => {
-      if (typeof str !== 'string') return str;
-      return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    };
-
     const Icon = ({ name, size = 20, className = "" }) => {
       const spanRef = React.useRef(null);
       
@@ -96,7 +85,6 @@
         let timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
         
         let startDate = new Date(`${dateStr}T${timeStr}:00`);
-        // 시간 파싱 에러 검증 방어
         if (isNaN(startDate.getTime())) {
           startDate = new Date(`${dateStr}T12:00:00`);
         }
@@ -133,7 +121,6 @@
         let timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
         
         let startDate = new Date(`${dateStr}T${timeStr}:00`);
-        // 시간 파싱 에러 검증 방어
         if (isNaN(startDate.getTime())) {
           startDate = new Date(`${dateStr}T12:00:00`);
         }
@@ -221,14 +208,13 @@
           if (error) {
             console.error("getGoals error:", error);
             alert(`목표 데이터를 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
-            return null;
+            throw error;
           }
           return data || [];
         },
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
-          const dbPayload = { ...goal, userId: userId };
-          
+          const dbPayload = { ...goal, userId: userId }; // userId 컬럼 매핑 고정
           try {
             if (goal.id) {
               const { data, error } = await supabase.from('goals').update(dbPayload).eq('id', goal.id).select();
@@ -261,14 +247,13 @@
           if (error) {
             console.error("getPlans error:", error);
             alert(`계획 데이터를 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
-            return null;
+            throw error;
           }
           return data || [];
         },
         savePlan: async (userId, plan) => {
           if (!supabase) return plan;
-          const dbPayload = { ...plan, userId: userId };
-
+          const dbPayload = { ...plan, userId: userId }; // userId 컬럼 매핑 고정
           try {
             if (plan.id) {
               const { data, error } = await supabase.from('plans').update(dbPayload).eq('id', plan.id).select();
@@ -301,7 +286,7 @@
           if (error) {
             console.error("getHabits error:", error);
             alert(`습관 데이터를 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
-            return null;
+            throw error;
           }
           return data.map(d => ({
             id: d.id,
@@ -365,7 +350,7 @@
           } catch (error) {
              console.error("getHabitLogs exception:", error);
              alert(`습관 기록을 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
-             return null;
+             throw error;
           }
         },
         toggleHabitLog: async (userId, habitId, dateStr, isCompleted) => {
@@ -640,7 +625,7 @@
           await onSave({ id: goal?.id, title, category, deadline, milestones: validMilestones });
           onClose();
         } catch(err) {
-          // 에러는 api.data 함수 내부에서 알럿으로 표시됨
+          // api.data handles alert
         } finally {
           setIsSubmitting(false);
         }
@@ -717,7 +702,7 @@
           try {
             await onDeleteGoal(goalToDelete); 
           } catch(err) {
-            // 에러 알럿은 내부 api 함수에서 발생
+            console.error(err);
           } finally {
             setGoalToDelete(null);
             setIsDeleting(false);
@@ -732,7 +717,7 @@
         try {
           await onToggleComplete(goal);
         } catch(err) {
-          // 에러 알럿 발생함
+          console.error(err);
         } finally {
           setProcessingIds(prev => { const next = new Set(prev); next.delete(goal.id); return next; });
         }
@@ -847,7 +832,7 @@
           const saved = await onSavePlan(newPlan);
           setSavedPlanData({ plan: saved || newPlan, goal: activeGoal });
         } catch(err) {
-          // 에러는 api 내에서 알럿 처리됨
+          console.error(err);
         } finally {
           setIsSubmitting(false);
         }
@@ -994,7 +979,7 @@
           try {
             await onDeletePlan(planToDelete); 
           } catch(err) {
-            // 알럿 발생됨
+            console.error(err);
           } finally {
             setPlanToDelete(null); 
             setIsDeleting(false);
@@ -1009,7 +994,7 @@
           const isCompleted = plan.status === 'completed';
           await onUpdatePlan({ ...plan, status: isCompleted ? 'planned' : 'completed' });
         } catch(err) {
-          // 알럿 발생됨
+          console.error(err);
         } finally {
           setProcessingIds(prev => { const next = new Set(prev); next.delete(plan.id); return next; });
         }
@@ -1113,7 +1098,7 @@
           await onSave({ id: habit?.id, title, time: timeStr, repeatDays });
           onClose();
         } catch(err) {
-          // api 로직에서 알럿 처리됨
+          console.error(err);
         } finally {
           setIsSubmitting(false);
         }
@@ -1197,7 +1182,7 @@
           try {
             await onDeleteHabit(habitToDelete); 
           } catch(err) {
-             // 에러 발생함
+             console.error(err);
           } finally {
             setHabitToDelete(null); 
             setIsDeleting(false);
@@ -1396,20 +1381,17 @@
       };
 
       const handleSaveGoal = async (goal) => {
-        const sanitizedGoal = {
-           ...goal,
-           title: sanitize(goal.title),
-           category: sanitize(goal.category),
-           milestones: goal.milestones?.map(m => ({ ...m, title: sanitize(m.title) }))
-        };
         try {
-          const saved = await api.data.saveGoal(user.id, sanitizedGoal);
+          const saved = await api.data.saveGoal(user.id, goal);
           setGoals(prev => {
             const idx = prev.findIndex(g => g.id === saved.id);
             if (idx >= 0) { const updated = [...prev]; updated[idx] = saved; return updated; }
             return [...prev, saved];
           });
-        } catch(e) {}
+        } catch(e) {
+          // api.data 헬퍼 내부에 alert 처리되어 있음
+          console.error(e);
+        }
       };
 
       const handleToggleGoalComplete = async (goal) => {
@@ -1417,75 +1399,68 @@
         try {
           const saved = await api.data.saveGoal(user.id, updatedGoal);
           setGoals(prev => prev.map(g => g.id === saved.id ? saved : g));
-        } catch(e) {}
+        } catch(e) {
+          console.error(e);
+        }
       };
       
       const handleDeleteGoal = async (goalId) => { 
         try {
           await api.data.deleteGoal(goalId); 
           setGoals(prev => prev.filter(g => g.id !== goalId)); 
-        } catch(e) {}
+        } catch(e) {
+          console.error(e);
+        }
       };
 
       const handleSavePlan = async (plan) => { 
-        const sanitizedPlan = {
-           ...plan,
-           actionText: sanitize(plan.actionText),
-           timeText: sanitize(plan.timeText),
-           timeMemo: sanitize(plan.timeMemo),
-           blockerText: sanitize(plan.blockerText),
-           solutionText: sanitize(plan.solutionText),
-           notes: sanitize(plan.notes)
-        };
         try {
-          const saved = await api.data.savePlan(user.id, sanitizedPlan); 
+          const saved = await api.data.savePlan(user.id, plan); 
           setPlans(prev => [saved, ...prev]); 
           return saved; 
-        } catch(e) { throw e; }
+        } catch(e) { 
+          console.error(e);
+          throw e; 
+        }
       };
 
       const handleUpdatePlan = async (plan) => { 
-        const sanitizedPlan = {
-           ...plan,
-           actionText: sanitize(plan.actionText),
-           timeText: sanitize(plan.timeText),
-           timeMemo: sanitize(plan.timeMemo),
-           blockerText: sanitize(plan.blockerText),
-           solutionText: sanitize(plan.solutionText),
-           notes: sanitize(plan.notes)
-        };
         try {
-          const saved = await api.data.savePlan(user.id, sanitizedPlan); 
+          const saved = await api.data.savePlan(user.id, plan); 
           setPlans(prev => prev.map(p => p.id === saved.id ? saved : p)); 
-        } catch(e) {}
+        } catch(e) {
+          console.error(e);
+        }
       };
 
       const handleDeletePlan = async (planId) => { 
         try {
           await api.data.deletePlan(planId); 
           setPlans(prev => prev.filter(p => p.id !== planId)); 
-        } catch(e) {}
+        } catch(e) {
+          console.error(e);
+        }
       };
 
       const handleSaveHabit = async (habit) => {
-        const sanitizedHabit = {
-           ...habit,
-           title: sanitize(habit.title)
-        };
         try {
-          const saved = await api.data.saveHabit(user.id, sanitizedHabit);
+          const saved = await api.data.saveHabit(user.id, habit);
           if (saved) {
             const refreshedHabits = await api.data.getHabits(user.id);
             if (refreshedHabits !== null) setHabits(refreshedHabits);
           }
-        } catch(e) {}
+        } catch(e) {
+          console.error(e);
+        }
       };
       
       const handleDeleteHabit = async (habitId) => { 
         try {
           await api.data.deleteHabit(habitId); 
           setHabits(prev => prev.filter(h => h.id !== habitId)); 
-        } catch(e) {}
+        } catch(e) {
+          console.error(e);
+        }
       };
       
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
