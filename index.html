@@ -20,9 +20,6 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    // ==========================================
-    // 0. Supabase 연동 설정 & 헬퍼 함수
-    // ==========================================
     const SUPABASE_URL = "https://tuvzubjiucnlvtdagqqe.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_WG9ZK-Xugns3X_fsksQ2jw_9XV7UQCD";
 
@@ -40,7 +37,6 @@
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Lucide 아이콘 React 래퍼 컴포넌트
     const Icon = ({ name, size = 20, className = "" }) => {
       const spanRef = React.useRef(null);
       
@@ -63,12 +59,9 @@
       return <span ref={spanRef} className={`inline-flex items-center justify-center ${className}`} />;
     };
 
-    // 한국 시간(KST) 기준 YYYY-MM-DD 포맷 반환 (타임존 오차 방지)
     const getKSTYYYYMMDD = (dateVal) => {
       const d = new Date(dateVal);
-      // 현재 Date의 UTC 시간 확보
       const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-      // KST(UTC+9)로 변환
       const kstDate = new Date(utc + (9 * 3600000));
       const year = kstDate.getFullYear();
       const month = String(kstDate.getMonth() + 1).padStart(2, '0');
@@ -76,7 +69,6 @@
       return `${year}-${month}-${day}`;
     };
 
-    // 분 단위 시간 텍스트 포맷 (오차 없는 정수 계산)
     const formatTime = (minutes) => {
       const m = parseInt(minutes, 10) || 0;
       if (m <= 0) return '0분';
@@ -87,7 +79,6 @@
       return `${mins}분`;
     };
 
-    // 구글 캘린더 Web Intent
     const generateGoogleCalendarLink = (plan, goal) => {
       try {
         const dateStr = plan.date || getKSTYYYYMMDD(new Date());
@@ -110,7 +101,15 @@
       }
     };
 
-    // 애플 캘린더 Web Intent (.ics)
+    const escapeICS = (str) => {
+      if (!str) return '';
+      return str.toString()
+        .replace(/\\/g, '\\\\')
+        .replace(/;/g, '\\;')
+        .replace(/,/g, '\\,')
+        .replace(/\n/g, '\\n');
+    };
+
     const generateCalendarICS = (plan, goal) => {
       try {
         const dateStr = plan.date || getKSTYYYYMMDD(new Date());
@@ -124,8 +123,8 @@
         const dtEnd = formatICSDate(endDate);
         const dtStamp = formatICSDate(new Date());
         
-        const summary = `[${goal?.title || '최강 목표'}] 실행 계획: ${plan.actionText}`;
-        const description = `실행 내용: ${plan.actionText}\\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\\n상세 메모: ' + plan.timeMemo : ''}`;
+        const summary = escapeICS(`[${goal?.title || '최강 목표'}] 실행 계획: ${plan.actionText}`);
+        const description = escapeICS(`실행 내용: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 메모: ' + plan.timeMemo : ''}`);
 
         const icsContent = [
           'BEGIN:VCALENDAR',
@@ -156,9 +155,6 @@
       }
     };
 
-    // ==========================================
-    // 1. Supabase API 데이터 처리 레이어
-    // ==========================================
     const api = {
       auth: {
         signUp: async (email, password) => {
@@ -183,7 +179,6 @@
         },
         getUser: async () => {
           if (!supabase) return null;
-          // 불필요한 콘솔 에러를 방지하기 위해 로컬 세션부터 확인
           const { data: sessionData } = await supabase.auth.getSession();
           if (!sessionData?.session) return null;
           const { data, error } = await supabase.auth.getUser();
@@ -198,58 +193,69 @@
       },
       data: {
         getGoals: async (userId) => {
-          if (!supabase) return [];
+          if (!supabase) return null;
           const { data, error } = await supabase.from('goals').select('*').eq('userId', userId);
-          if (error) console.error("getGoals error:", error);
+          if (error) {
+            console.error("getGoals error:", error);
+            alert('목표 데이터를 불러오는 중 오류가 발생했습니다.');
+            return null;
+          }
           return data || [];
         },
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
           if (goal.id) {
             const { data, error } = await supabase.from('goals').update(goal).eq('id', goal.id).select();
-            if (error) console.error("saveGoal update error:", error);
+            if (error) { console.error("saveGoal update error:", error); throw error; }
             return data ? data[0] : goal;
           } else {
             const newGoal = { ...goal, userId, id: crypto.randomUUID() };
             const { data, error } = await supabase.from('goals').insert(newGoal).select();
-            if (error) console.error("saveGoal insert error:", error);
+            if (error) { console.error("saveGoal insert error:", error); throw error; }
             return data ? data[0] : newGoal;
           }
         },
         deleteGoal: async (goalId) => {
           if (!supabase) return;
           const { error } = await supabase.from('goals').delete().eq('id', goalId);
-          if (error) console.error("deleteGoal error:", error);
+          if (error) { console.error("deleteGoal error:", error); throw error; }
         },
         getPlans: async (userId) => {
-          if (!supabase) return [];
+          if (!supabase) return null;
           const { data, error } = await supabase.from('plans').select('*').eq('userId', userId);
-          if (error) console.error("getPlans error:", error);
+          if (error) {
+            console.error("getPlans error:", error);
+            alert('계획 데이터를 불러오는 중 오류가 발생했습니다.');
+            return null;
+          }
           return data || [];
         },
         savePlan: async (userId, plan) => {
           if (!supabase) return plan;
           if (plan.id) {
             const { data, error } = await supabase.from('plans').update(plan).eq('id', plan.id).select();
-            if (error) console.error("savePlan update error:", error);
+            if (error) { console.error("savePlan update error:", error); throw error; }
             return data ? data[0] : plan;
           } else {
             const newPlan = { ...plan, userId, id: crypto.randomUUID() };
             const { data, error } = await supabase.from('plans').insert(newPlan).select();
-            if (error) console.error("savePlan insert error:", error);
+            if (error) { console.error("savePlan insert error:", error); throw error; }
             return data ? data[0] : newPlan;
           }
         },
         deletePlan: async (planId) => {
           if (!supabase) return;
           const { error } = await supabase.from('plans').delete().eq('id', planId);
-          if (error) console.error("deletePlan error:", error);
+          if (error) { console.error("deletePlan error:", error); throw error; }
         },
         getHabits: async (userId) => {
-          if (!supabase) return [];
+          if (!supabase) return null;
           const { data, error } = await supabase.from('habits').select('*').eq('user_id', userId);
-          if (error) { console.error("getHabits error:", error); return []; }
-          // exec_time 컬럼을 프론트엔드의 time 필드로 맵핑
+          if (error) {
+            console.error("getHabits error:", error);
+            alert("습관 데이터를 불러오는 중 오류가 발생했습니다.");
+            return null;
+          }
           return data.map(d => ({
             id: d.id,
             userId: d.user_id,
@@ -260,12 +266,9 @@
         },
         saveHabit: async (userId, habit) => {
           if (!supabase) return habit;
-          
-          // 정수 배열 강제 변환
           const parsedRepeatDays = (habit.repeatDays || []).map(d => parseInt(d, 10)).filter(n => !isNaN(n));
           const validTime = habit.time && habit.time.trim() !== '' ? habit.time : null;
 
-          // DB payload 작성 - DB 컬럼명 exec_time 준수
           const dbPayload = {
             title: habit.title,
             exec_time: validTime,
@@ -276,38 +279,18 @@
           try {
             if (habit.id) {
               const { data, error } = await supabase.from('habits').update(dbPayload).eq('id', habit.id).select();
-              if (error) {
-                alert('저장 실패 (업데이트): ' + JSON.stringify(error));
-                console.error("saveHabit update error:", error.message, error.details, error.hint, error);
-                return null;
-              }
+              if (error) throw error;
               alert('습관이 성공적으로 수정되었습니다!');
-              return {
-                  id: data[0].id,
-                  userId: data[0].user_id,
-                  title: data[0].title,
-                  time: data[0].exec_time,
-                  repeatDays: data[0].repeat_days
-              };
+              return { id: data[0].id, userId: data[0].user_id, title: data[0].title, time: data[0].exec_time, repeatDays: data[0].repeat_days };
             } else {
               dbPayload.id = crypto.randomUUID();
               const { data, error } = await supabase.from('habits').insert(dbPayload).select();
-              if (error) {
-                alert('저장 실패 (신규 추가): ' + JSON.stringify(error));
-                console.error("saveHabit insert error:", error.message, error.details, error.hint, error);
-                return null;
-              }
+              if (error) throw error;
               alert('새로운 습관이 등록되었습니다!');
-              return {
-                  id: data[0].id,
-                  userId: data[0].user_id,
-                  title: data[0].title,
-                  time: data[0].exec_time,
-                  repeatDays: data[0].repeat_days
-              };
+              return { id: data[0].id, userId: data[0].user_id, title: data[0].title, time: data[0].exec_time, repeatDays: data[0].repeat_days };
             }
           } catch (err) {
-            alert('저장 실패 (예외 발생): ' + err.message);
+            alert('저장 실패: ' + (err.message || JSON.stringify(err)));
             console.error("saveHabit exception:", err);
             return null;
           }
@@ -315,62 +298,49 @@
         deleteHabit: async (habitId) => {
           if (!supabase) return;
           const { error } = await supabase.from('habits').delete().eq('id', habitId);
-          if (error) console.error("deleteHabit error:", error);
+          if (error) { console.error("deleteHabit error:", error); throw error; }
         },
         getHabitLogs: async (userId) => {
-          if (!supabase) return [];
+          if (!supabase) return null;
           try {
             const { data, error } = await supabase.from('habit_logs').select('*').eq('user_id', userId);
-            if (error) { console.error("getHabitLogs error:", error); return []; }
+            if (error) throw error;
             return data.map(d => ({
               id: d.id,
               habitId: d.habit_id,
               userId: d.user_id,
-              date: d.date || d.completed_date // 두 컬럼 가능성 모두 대응
+              date: d.date || d.completed_date
             }));
           } catch (err) {
              console.error("getHabitLogs exception:", err);
-             return [];
+             alert("습관 기록을 불러오는 중 오류가 발생했습니다.");
+             return null;
           }
         },
         toggleHabitLog: async (userId, habitId, dateStr, isCompleted) => {
           if (!supabase) return null;
           try {
             if (isCompleted) {
-              // 체크 해제 (삭제) - date 대신 completed_date 사용
               const { error } = await supabase.from('habit_logs')
                 .delete()
                 .match({ habit_id: habitId, completed_date: dateStr, user_id: userId });
-              
               if (error) throw error;
               return { success: true, action: 'deleted' };
             } else {
-              // 체크 (생성) - date 대신 completed_date 사용
               const newLog = { habit_id: habitId, user_id: userId, completed_date: dateStr, is_completed: true };
               const { error } = await supabase.from('habit_logs').insert(newLog);
-              
               if (error) throw error;
               return { success: true, action: 'inserted' };
             }
           } catch (err) {
-            alert('기록 동기화 실패: ' + (err.message || JSON.stringify(err)));
+            alert('체크 저장 실패: ' + (err.message || JSON.stringify(err)));
             console.error("toggleHabitLog exception:", err);
             return { error: err };
           }
-        },
-        getAllAdminData: async () => {
-          if (!supabase) return { users: [], goals: [], plans: [] };
-          const { data: users } = await supabase.from('profiles').select('*');
-          const { data: goals } = await supabase.from('goals').select('*');
-          const { data: plans } = await supabase.from('plans').select('*');
-          return { users: users || [], goals: goals || [], plans: plans || [] };
         }
       }
     };
 
-    // ==========================================
-    // 2. 공통 커스텀 모달 컴포넌트
-    // ==========================================
     const CustomModal = ({ isOpen, title, children, onClose }) => {
       if (!isOpen) return null;
       return (
@@ -388,23 +358,20 @@
       );
     };
 
-    const ConfirmModal = ({ isOpen, message, onConfirm, onClose }) => (
+    const ConfirmModal = ({ isOpen, message, onConfirm, onClose, isProcessing }) => (
       <CustomModal isOpen={isOpen} title="확인" onClose={onClose}>
         <p className="text-sm text-slate-300 mb-6">{message}</p>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition">
+          <button onClick={onClose} disabled={isProcessing} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition disabled:opacity-50">
             취소
           </button>
-          <button onClick={() => { onConfirm(); onClose(); }} className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-red-600/20">
-            실행
+          <button onClick={() => { onConfirm(); }} disabled={isProcessing} className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-red-600/20 disabled:opacity-50">
+            {isProcessing ? '처리 중...' : '실행'}
           </button>
         </div>
       </CustomModal>
     );
 
-    // ==========================================
-    // 3. 인증 화면 (로그인 / 비밀번호 재설정 모달)
-    // ==========================================
     const ResetPasswordModal = ({ isOpen, onClose }) => {
       const [newPassword, setNewPassword] = React.useState('');
       const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -560,15 +527,13 @@
       );
     };
 
-    // ==========================================
-    // 4. 뷰 1: 목표 페이지 (폼 및 목록)
-    // ==========================================
     const GoalFormModal = ({ isOpen, onClose, onSave, goal }) => {
       const [title, setTitle] = React.useState('');
       const [category, setCategory] = React.useState('커리어');
       const [deadline, setDeadline] = React.useState('');
       const [milestones, setMilestones] = React.useState([]);
       const [draggedIndex, setDraggedIndex] = React.useState(null);
+      const [isSubmitting, setIsSubmitting] = React.useState(false);
 
       React.useEffect(() => {
         if (goal) {
@@ -577,6 +542,7 @@
         } else {
           setTitle(''); setCategory('커리어'); setDeadline(''); setMilestones([]);
         }
+        setIsSubmitting(false);
       }, [goal, isOpen]);
 
       if (!isOpen) return null;
@@ -597,11 +563,20 @@
       };
       const handleDragEnd = () => setDraggedIndex(null);
 
-      const handleSubmit = (e) => {
+      const handleSubmit = async (e) => {
         e.preventDefault();
-        const validMilestones = (milestones || []).filter(m => m && m.id && m.title.trim() !== '');
-        onSave({ id: goal?.id, title, category, deadline, milestones: validMilestones });
-        onClose();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+          const validMilestones = (milestones || []).filter(m => m && m.id && m.title.trim() !== '');
+          await onSave({ id: goal?.id, title, category, deadline, milestones: validMilestones });
+          onClose();
+        } catch(err) {
+          console.error(err);
+          alert('저장 중 오류가 발생했습니다.');
+        } finally {
+          setIsSubmitting(false);
+        }
       };
 
       return (
@@ -644,8 +619,10 @@
               </div>
             </div>
             <div className="pt-4 flex justify-end gap-2 border-t border-slate-800">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-lg">취소</button>
-              <button type="submit" className="px-4 py-2 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-lg shadow-lg shadow-orange-600/20">저장하기</button>
+              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-lg disabled:opacity-50">취소</button>
+              <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-lg shadow-lg shadow-orange-600/20 disabled:opacity-50">
+                {isSubmitting ? '저장 중...' : '저장하기'}
+              </button>
             </div>
           </form>
         </CustomModal>
@@ -656,8 +633,35 @@
       const [selectedGoal, setSelectedGoal] = React.useState(null);
       const [isModalOpen, setIsModalOpen] = React.useState(false);
       const [goalToDelete, setGoalToDelete] = React.useState(null);
+      const [processingIds, setProcessingIds] = React.useState(new Set());
+      const [isDeleting, setIsDeleting] = React.useState(false);
 
-      const confirmDelete = () => { if (goalToDelete) { onDeleteGoal(goalToDelete); setGoalToDelete(null); } };
+      const confirmDelete = async () => { 
+        if (goalToDelete) { 
+          setIsDeleting(true);
+          try {
+            await onDeleteGoal(goalToDelete); 
+          } catch(err) {
+            alert('목표 삭제 실패');
+          } finally {
+            setGoalToDelete(null);
+            setIsDeleting(false);
+          }
+        } 
+      };
+
+      const handleToggle = async (e, goal) => {
+        e.stopPropagation();
+        if (processingIds.has(goal.id)) return;
+        setProcessingIds(prev => new Set(prev).add(goal.id));
+        try {
+          await onToggleComplete(goal);
+        } catch(err) {
+          alert('상태 변경 실패');
+        } finally {
+          setProcessingIds(prev => { const next = new Set(prev); next.delete(goal.id); return next; });
+        }
+      };
 
       const calculateDDay = (deadline) => {
         if (!deadline) return '';
@@ -670,7 +674,7 @@
 
       return (
         <div className="space-y-6 relative z-10">
-          <ConfirmModal isOpen={!!goalToDelete} message="목표를 삭제하시겠습니까? 연관된 계획도 영향받을 수 있습니다." onConfirm={confirmDelete} onClose={() => setGoalToDelete(null)} />
+          <ConfirmModal isOpen={!!goalToDelete} message="목표를 삭제하시겠습니까? 연관된 계획도 영향받을 수 있습니다." onConfirm={confirmDelete} onClose={() => setGoalToDelete(null)} isProcessing={isDeleting} />
           
           <div className="flex justify-between items-center">
             <div>
@@ -694,14 +698,15 @@
                 const isOverdue = dDay.startsWith('D+');
                 const milestones = goal.milestones || [];
                 const completedCount = milestones.filter(m => m.completed).length;
+                const isProcessing = processingIds.has(goal.id);
 
                 return (
                   <div key={goal.id} className={`bg-slate-900 border border-slate-800 p-5 rounded-2xl transition group flex flex-col justify-between ${goal.is_completed ? 'opacity-60 grayscale-[30%]' : 'hover:border-slate-700'}`}>
                     <div>
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex items-center gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); onToggleComplete(goal); }} className={`flex items-center justify-center w-5 h-5 rounded border transition ${goal.is_completed ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-500 text-transparent hover:border-orange-500'}`}>
-                            <Icon name="Check" size={14} />
+                          <button onClick={(e) => handleToggle(e, goal)} disabled={isProcessing} className={`flex items-center justify-center w-5 h-5 rounded border transition disabled:opacity-50 ${goal.is_completed ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-500 text-transparent hover:border-orange-500'}`}>
+                            <Icon name={isProcessing ? "Loader2" : "Check"} size={14} className={isProcessing ? "animate-spin text-white" : ""} />
                           </button>
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-orange-400 border border-orange-500/20">{goal.category}</span>
                           {goal.is_completed && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">완료됨</span>}
@@ -729,9 +734,6 @@
       );
     };
 
-    // ==========================================
-    // 5. 뷰 2: 계획 페이지 (대화형 마법사)
-    // ==========================================
     const ExecutionView = ({ goals, onSavePlan }) => {
       const [step, setStep] = React.useState(1);
       const [selectedGoalId, setSelectedGoalId] = React.useState('');
@@ -744,27 +746,36 @@
       const [blockerText, setBlockerText] = React.useState('');
       const [solutionText, setSolutionText] = React.useState('');
       const [savedPlanData, setSavedPlanData] = React.useState(null);
+      const [isSubmitting, setIsSubmitting] = React.useState(false);
 
       const activeGoal = goals.find(g => g.id === selectedGoalId);
 
       const handleComplete = async () => {
-        const newPlan = {
-          date: getKSTYYYYMMDD(new Date()),
-          goalId: selectedGoalId,
-          milestoneId: selectedMilestoneId,
-          actionText,
-          timeText,
-          timeMemo,
-          durationPlanned: parseInt(durationPlanned, 10) || 0,
-          hasBlocker,
-          blockerText,
-          solutionText,
-          status: 'planned',
-          durationActual: 0,
-          notes: ''
-        };
-        const saved = await onSavePlan(newPlan);
-        setSavedPlanData({ plan: saved || newPlan, goal: activeGoal });
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+          const newPlan = {
+            date: getKSTYYYYMMDD(new Date()),
+            goalId: selectedGoalId,
+            milestoneId: selectedMilestoneId,
+            actionText,
+            timeText,
+            timeMemo,
+            durationPlanned: parseInt(durationPlanned, 10) || 0,
+            hasBlocker,
+            blockerText,
+            solutionText,
+            status: 'planned',
+            durationActual: 0,
+            notes: ''
+          };
+          const saved = await onSavePlan(newPlan);
+          setSavedPlanData({ plan: saved || newPlan, goal: activeGoal });
+        } catch(err) {
+          alert('계획 저장에 실패했습니다.');
+        } finally {
+          setIsSubmitting(false);
+        }
       };
 
       const handleCloseModal = () => {
@@ -831,8 +842,8 @@
 
             {step === 3 && (
               <div className="space-y-4">
-                <span className="text-xs font-bold text-orange-400">Q3. 실행 계획 및 시간</span>
-                <h3 className="text-lg font-bold text-white">언제, 얼마나 하시겠어요?</h3>
+                <span className="text-xs font-bold text-orange-400">Q3. 언제 하시겠어요?</span>
+                <h3 className="text-lg font-bold text-white">실행 예정 시간과 상세 메모를 남겨주세요.</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간</label>
@@ -885,8 +896,10 @@
                   <p><span className="text-slate-400">수행 시점:</span> <strong className="text-white">{timeText} ({formatTime(durationPlanned)}) {timeMemo && `- ${timeMemo}`}</strong></p>
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setStep(1)} className="flex-1 py-3 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-700 transition">다시 생각해볼게</button>
-                  <button onClick={handleComplete} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition">물론, 가능하지!</button>
+                  <button onClick={() => setStep(1)} disabled={isSubmitting} className="flex-1 py-3 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-700 transition disabled:opacity-50">다시 생각해볼게</button>
+                  <button onClick={handleComplete} disabled={isSubmitting} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition disabled:opacity-50">
+                    {isSubmitting ? '저장 중...' : '물론, 가능하지!'}
+                  </button>
                 </div>
               </div>
             )}
@@ -895,15 +908,41 @@
       );
     };
 
-    // ==========================================
-    // 6. 뷰 3: 실행 일지 
-    // ==========================================
     const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan }) => {
       const [planToDelete, setPlanToDelete] = React.useState(null);
+      const [processingIds, setProcessingIds] = React.useState(new Set());
+      const [isDeleting, setIsDeleting] = React.useState(false);
+
+      const confirmDelete = async () => { 
+        if (planToDelete) { 
+          setIsDeleting(true);
+          try {
+            await onDeletePlan(planToDelete); 
+          } catch(err) {
+            alert('삭제 실패');
+          } finally {
+            setPlanToDelete(null); 
+            setIsDeleting(false);
+          }
+        } 
+      };
+
+      const handleToggleStatus = async (plan) => {
+        if (processingIds.has(plan.id)) return;
+        setProcessingIds(prev => new Set(prev).add(plan.id));
+        try {
+          const isCompleted = plan.status === 'completed';
+          await onUpdatePlan({ ...plan, status: isCompleted ? 'planned' : 'completed' });
+        } catch(err) {
+          alert('상태 변경 실패');
+        } finally {
+          setProcessingIds(prev => { const next = new Set(prev); next.delete(plan.id); return next; });
+        }
+      };
 
       return (
         <div className="space-y-6 relative z-10">
-          <ConfirmModal isOpen={!!planToDelete} message="정말 이 일일 계획을 삭제하시겠습니까?" onConfirm={() => { onDeletePlan(planToDelete); setPlanToDelete(null); }} onClose={() => setPlanToDelete(null)} />
+          <ConfirmModal isOpen={!!planToDelete} message="정말 이 일일 계획을 삭제하시겠습니까?" onConfirm={confirmDelete} onClose={() => setPlanToDelete(null)} isProcessing={isDeleting} />
           
           <div>
             <h2 className="text-xl font-bold text-white">실행 목록 일지</h2>
@@ -920,6 +959,7 @@
               plans.map(plan => {
                 const goal = goals.find(g => g.id === plan.goalId);
                 const isCompleted = plan.status === 'completed';
+                const isProcessing = processingIds.has(plan.id);
 
                 return (
                   <div key={plan.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
@@ -945,8 +985,8 @@
                       </div>
                       <div>
                         <label className="text-slate-400 block mb-1">달성 여부</label>
-                        <button onClick={() => onUpdatePlan({ ...plan, status: isCompleted ? 'planned' : 'completed' })} className={`w-full py-1.5 rounded font-semibold text-xs border transition ${isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
-                          {isCompleted ? '✓ 완료' : '미달성 (클릭)'}
+                        <button onClick={() => handleToggleStatus(plan)} disabled={isProcessing} className={`w-full py-1.5 rounded font-semibold text-xs border transition disabled:opacity-50 flex justify-center items-center gap-1 ${isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
+                          {isProcessing ? <Icon name="Loader2" size={14} className="animate-spin" /> : (isCompleted ? '✓ 완료' : '미달성 (클릭)')}
                         </button>
                       </div>
                     </div>
@@ -964,13 +1004,11 @@
       );
     };
 
-    // ==========================================
-    // 7. 뷰 4: 습관 관리 페이지
-    // ==========================================
     const HabitFormModal = ({ isOpen, onClose, onSave, habit }) => {
       const [title, setTitle] = React.useState('');
       const [timeStr, setTimeStr] = React.useState('09:00');
       const [repeatDays, setRepeatDays] = React.useState([]);
+      const [isSubmitting, setIsSubmitting] = React.useState(false);
 
       React.useEffect(() => {
         if (habit) {
@@ -978,6 +1016,7 @@
         } else {
           setTitle(''); setTimeStr('09:00'); setRepeatDays([1,2,3,4,5]); 
         }
+        setIsSubmitting(false);
       }, [habit, isOpen]);
 
       if (!isOpen) return null;
@@ -989,14 +1028,20 @@
 
       const handleSubmit = async (e) => {
         if (e) e.preventDefault(); 
-        
         if (repeatDays.length === 0) {
           alert('최소 하루 이상 반복 요일을 선택해주세요.');
           return;
         }
-        
-        await onSave({ id: habit?.id, title, time: timeStr, repeatDays });
-        onClose();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+          await onSave({ id: habit?.id, title, time: timeStr, repeatDays });
+          onClose();
+        } catch(err) {
+          alert('저장 실패');
+        } finally {
+          setIsSubmitting(false);
+        }
       };
 
       const dayLabels = [{v:1, l:'월'}, {v:2, l:'화'}, {v:3, l:'수'}, {v:4, l:'목'}, {v:5, l:'금'}, {v:6, l:'토'}, {v:0, l:'일'}];
@@ -1023,8 +1068,10 @@
               </div>
             </div>
             <div className="pt-2 flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-xl">취소</button>
-              <button type="button" onClick={handleSubmit} className="px-4 py-2.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-xl shadow-lg shadow-orange-600/20">저장하기</button>
+              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-xl disabled:opacity-50">취소</button>
+              <button type="submit" disabled={isSubmitting} className="px-4 py-2.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-xl shadow-lg shadow-orange-600/20 disabled:opacity-50">
+                {isSubmitting ? '저장 중...' : '저장하기'}
+              </button>
             </div>
           </form>
         </CustomModal>
@@ -1036,6 +1083,8 @@
       const [isModalOpen, setIsModalOpen] = React.useState(false);
       const [editingHabit, setEditingHabit] = React.useState(null);
       const [habitToDelete, setHabitToDelete] = React.useState(null);
+      const [processingIds, setProcessingIds] = React.useState(new Set());
+      const [isDeleting, setIsDeleting] = React.useState(false);
 
       const weekDates = React.useMemo(() => {
         const d = new Date();
@@ -1051,7 +1100,6 @@
       }, []);
 
       const dayLabels = ['일', '월', '화', '수', '목', '금', '토'];
-      // KST 기반의 정확한 YYYY-MM-DD 스트링 획득
       const selectedDateStr = getKSTYYYYMMDD(selectedDateObj);
       const selectedDayInt = selectedDateObj.getDay();
       const dailyHabits = habits.filter(h => h.repeatDays && h.repeatDays.includes(selectedDayInt));
@@ -1068,11 +1116,33 @@
         return dates;
       };
 
-      const confirmDelete = () => { if (habitToDelete) { onDeleteHabit(habitToDelete); setHabitToDelete(null); } };
+      const confirmDelete = async () => { 
+        if (habitToDelete) { 
+          setIsDeleting(true);
+          try {
+            await onDeleteHabit(habitToDelete); 
+          } catch(err) {
+            alert('삭제 실패');
+          } finally {
+            setHabitToDelete(null); 
+            setIsDeleting(false);
+          }
+        } 
+      };
+
+      const handleToggleLog = async (habitId, dateStr, isCompleted) => {
+        if (processingIds.has(habitId)) return;
+        setProcessingIds(prev => new Set(prev).add(habitId));
+        try {
+          await onToggleHabitLog(habitId, dateStr, isCompleted);
+        } finally {
+          setProcessingIds(prev => { const next = new Set(prev); next.delete(habitId); return next; });
+        }
+      };
 
       return (
         <div className="space-y-6 relative z-10">
-          <ConfirmModal isOpen={!!habitToDelete} message="습관을 삭제하시겠습니까? 누적된 달성 기록도 함께 사라집니다." onConfirm={confirmDelete} onClose={() => setHabitToDelete(null)} />
+          <ConfirmModal isOpen={!!habitToDelete} message="습관을 삭제하시겠습니까? 누적된 달성 기록도 함께 사라집니다." onConfirm={confirmDelete} onClose={() => setHabitToDelete(null)} isProcessing={isDeleting} />
           
           <div className="flex justify-between items-center">
             <div>
@@ -1106,6 +1176,7 @@
             ) : (
               dailyHabits.map(habit => {
                 const isCompleted = habitLogs.some(log => log.habitId === habit.id && log.date === selectedDateStr);
+                const isProcessing = processingIds.has(habit.id);
                 const last7Dates = getLast7ExpectedDates(habit);
                 let successCount = 0;
                 const dotElements = last7Dates.map(dateStr => {
@@ -1118,8 +1189,8 @@
                   <div key={habit.id} className={`bg-slate-900 border border-slate-800 p-5 rounded-2xl transition group flex flex-col justify-between ${isCompleted ? 'opacity-70' : 'hover:border-slate-700'}`}>
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
-                        <button onClick={() => onToggleHabitLog(habit.id, selectedDateStr, isCompleted)} className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded border transition ${isCompleted ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-500 text-transparent hover:border-orange-500'}`}>
-                          <Icon name="Check" size={16} />
+                        <button onClick={() => handleToggleLog(habit.id, selectedDateStr, isCompleted)} disabled={isProcessing} className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded border transition disabled:opacity-50 ${isCompleted ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-500 text-transparent hover:border-orange-500'}`}>
+                          <Icon name={isProcessing ? "Loader2" : "Check"} size={16} className={isProcessing ? "animate-spin text-white" : ""} />
                         </button>
                         <div>
                           <span className="text-[10px] text-orange-400 font-semibold mb-0.5 block">{habit.time}</span>
@@ -1145,9 +1216,6 @@
       );
     };
 
-    // ==========================================
-    // 8. 뷰 5: 통계 리포트
-    // ==========================================
     const StatsView = ({ plans, goals }) => {
       const [filter, setFilter] = React.useState('weekly');
       const completedPlans = plans.filter(p => p.status === 'completed');
@@ -1176,28 +1244,6 @@
       );
     };
 
-    // ==========================================
-    // 9. 뷰 6: 관리자 전용 대시보드
-    // ==========================================
-    const AdminView = () => {
-      const [adminData, setAdminData] = React.useState({ users: [], goals: [], plans: [] });
-      React.useEffect(() => { api.data.getAllAdminData().then(setAdminData); }, []);
-
-      return (
-        <div className="space-y-6 relative z-10">
-          <div><h2 className="text-xl font-bold text-white">관리자 전용 대시보드</h2><p className="text-xs text-slate-400">서비스 통합 지표를 조회합니다.</p></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block">전체 가입 유저 수</span><span className="text-2xl font-bold text-white mt-1">{adminData.users.length} 명</span></div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block">총 등록된 목표 수</span><span className="text-2xl font-bold text-orange-400 mt-1">{adminData.goals.length} 개</span></div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block">전체 실행 계획 수</span><span className="text-2xl font-bold text-emerald-400 mt-1">{adminData.plans.length} 건</span></div>
-          </div>
-        </div>
-      );
-    };
-
-    // ==========================================
-    // 10. 메인 App 컴포넌트
-    // ==========================================
     const App = () => {
       const [user, setUser] = React.useState(null);
       const [currentTab, setCurrentTab] = React.useState('goals');
@@ -1263,10 +1309,11 @@
             api.data.getHabits(userId),
             api.data.getHabitLogs(userId)
           ]);
-          setGoals(userGoals || []);
-          setPlans(userPlans || []);
-          setHabits(userHabits || []);
-          setHabitLogs(userHabitLogs || []);
+          // 에러 시 null이 반환되므로 상태를 덮어쓰지 않음
+          if (userGoals !== null) setGoals(userGoals);
+          if (userPlans !== null) setPlans(userPlans);
+          if (userHabits !== null) setHabits(userHabits);
+          if (userHabitLogs !== null) setHabitLogs(userHabitLogs);
         } catch (e) {
           console.error("데이터 로딩 중 에러:", e);
         } finally {
@@ -1299,7 +1346,7 @@
         const saved = await api.data.saveHabit(user.id, habit);
         if (saved) {
           const refreshedHabits = await api.data.getHabits(user.id);
-          setHabits(refreshedHabits || []);
+          if (refreshedHabits !== null) setHabits(refreshedHabits);
         }
       };
       
@@ -1307,12 +1354,9 @@
       
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
         const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
-        if (result && result.error) {
-           alert('체크 저장 실패: ' + (result.error.message || JSON.stringify(result.error)));
-        } else {
-           // DB 동기화 완료 후 즉각 re-fetch 하여 UI Persistence 보장
+        if (result && !result.error) {
            const refreshedLogs = await api.data.getHabitLogs(user.id);
-           setHabitLogs(refreshedLogs || []);
+           if (refreshedLogs !== null) setHabitLogs(refreshedLogs);
         }
       };
 
@@ -1329,8 +1373,6 @@
 
       if (!user) return <><AuthView onLoginSuccess={async (u) => { setUser(u); await loadUserData(u.id); }} /><ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} /></>;
 
-      const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'admin@test.com';
-
       return (
         <div className="min-h-screen flex flex-col bg-black text-slate-100">
           <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
@@ -1345,8 +1387,7 @@
                   { id: 'execution', label: '계획', icon: 'Edit3' },
                   { id: 'journal', label: '실행', icon: 'CheckSquare' },
                   { id: 'habits', label: '습관', icon: 'Activity' },
-                  { id: 'stats', label: '통계', icon: 'BarChart2' },
-                  ...(isAdmin ? [{ id: 'admin', label: '관리자', icon: 'Shield' }] : [])
+                  { id: 'stats', label: '통계', icon: 'BarChart2' }
                 ].map(tab => (
                   <button key={tab.id} onClick={() => setCurrentTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${currentTab === tab.id ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                     <Icon name={tab.icon} size={15} /> <span>{tab.label}</span>
@@ -1363,7 +1404,6 @@
             {currentTab === 'journal' && <JournalView plans={plans} goals={goals} onUpdatePlan={handleUpdatePlan} onDeletePlan={handleDeletePlan} />}
             {currentTab === 'habits' && <HabitsView habits={habits} habitLogs={habitLogs} onSaveHabit={handleSaveHabit} onDeleteHabit={handleDeleteHabit} onToggleHabitLog={handleToggleHabitLog} />}
             {currentTab === 'stats' && <StatsView plans={plans} goals={goals} />}
-            {currentTab === 'admin' && isAdmin && <AdminView />}
           </main>
 
           <ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} />
