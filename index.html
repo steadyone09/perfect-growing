@@ -37,6 +37,12 @@
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+    // XSS 방어 (Sanitization Helper)
+    const sanitize = (str) => {
+      if (typeof str !== 'string') return str;
+      return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+
     const Icon = ({ name, size = 20, className = "" }) => {
       const spanRef = React.useRef(null);
       
@@ -82,8 +88,14 @@
     const generateGoogleCalendarLink = (plan, goal) => {
       try {
         const dateStr = plan.date || getKSTYYYYMMDD(new Date());
-        const timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
-        const startDate = new Date(`${dateStr}T${timeStr}:00`);
+        let timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
+        
+        let startDate = new Date(`${dateStr}T${timeStr}:00`);
+        // 시간 파싱 에러 검증 방어
+        if (isNaN(startDate.getTime())) {
+          startDate = new Date(`${dateStr}T12:00:00`);
+        }
+
         const duration = parseInt(plan.durationPlanned, 10) || 30;
         const endDate = new Date(startDate.getTime() + duration * 60000);
 
@@ -113,8 +125,14 @@
     const generateCalendarICS = (plan, goal) => {
       try {
         const dateStr = plan.date || getKSTYYYYMMDD(new Date());
-        const timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
-        const startDate = new Date(`${dateStr}T${timeStr}:00`);
+        let timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
+        
+        let startDate = new Date(`${dateStr}T${timeStr}:00`);
+        // 시간 파싱 에러 검증 방어
+        if (isNaN(startDate.getTime())) {
+          startDate = new Date(`${dateStr}T12:00:00`);
+        }
+
         const duration = parseInt(plan.durationPlanned, 10) || 30;
         const endDate = new Date(startDate.getTime() + duration * 60000);
 
@@ -333,8 +351,6 @@
               return { success: true, action: 'inserted' };
             }
           } catch (err) {
-            alert('체크 저장 실패: ' + (err.message || JSON.stringify(err)));
-            console.error("toggleHabitLog exception:", err);
             return { error: err };
           }
         }
@@ -532,7 +548,9 @@
       const [category, setCategory] = React.useState('커리어');
       const [deadline, setDeadline] = React.useState('');
       const [milestones, setMilestones] = React.useState([]);
+      
       const [draggedIndex, setDraggedIndex] = React.useState(null);
+      const [draggedOverIndex, setDraggedOverIndex] = React.useState(null);
       const [isSubmitting, setIsSubmitting] = React.useState(false);
 
       React.useEffect(() => {
@@ -543,6 +561,8 @@
           setTitle(''); setCategory('커리어'); setDeadline(''); setMilestones([]);
         }
         setIsSubmitting(false);
+        setDraggedIndex(null);
+        setDraggedOverIndex(null);
       }, [goal, isOpen]);
 
       if (!isOpen) return null;
@@ -551,17 +571,33 @@
       const handleUpdateMilestone = (id, field, value) => setMilestones(milestones.map(m => m.id === id ? { ...m, [field]: value } : m));
       const handleRemoveMilestone = (id) => setMilestones(milestones.filter(m => m.id !== id));
 
-      const handleDragStart = (e, index) => { setDraggedIndex(index); e.dataTransfer.effectAllowed = "move"; };
+      // 드래그 앤 드롭 최적화
+      const handleDragStart = (e, index) => { 
+        setDraggedIndex(index); 
+        e.dataTransfer.effectAllowed = "move"; 
+      };
+      
       const handleDragOver = (e, index) => {
         e.preventDefault();
-        if (draggedIndex === null || draggedIndex === index || !milestones[draggedIndex] || !milestones[index]) return;
+        if (draggedIndex === null || draggedIndex === index) return;
+        setDraggedOverIndex(index);
+      };
+      
+      const handleDrop = (e, index) => {
+        e.preventDefault();
+        if (draggedIndex === null || draggedIndex === index) return;
         const updated = [...milestones];
         const item = updated.splice(draggedIndex, 1)[0];
         updated.splice(index, 0, item);
-        setDraggedIndex(index);
         setMilestones(updated);
+        setDraggedIndex(null);
+        setDraggedOverIndex(null);
       };
-      const handleDragEnd = () => setDraggedIndex(null);
+      
+      const handleDragEnd = () => { 
+        setDraggedIndex(null);
+        setDraggedOverIndex(null);
+      };
 
       const handleSubmit = async (e) => {
         e.preventDefault();
@@ -608,7 +644,15 @@
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {milestones.length === 0 ? <p className="text-xs text-slate-500 text-center py-4">등록된 중간 단계가 없습니다.</p> : (
                   milestones.map((m, idx) => m && m.id ? (
-                    <div key={m.id} draggable onDragStart={(e) => handleDragStart(e, idx)} onDragOver={(e) => handleDragOver(e, idx)} onDragEnd={handleDragEnd} className={`flex items-center gap-2 bg-slate-950 p-2 rounded-xl border ${draggedIndex === idx ? 'border-orange-500 bg-slate-800/50' : 'border-slate-800'}`}>
+                    <div 
+                      key={m.id} 
+                      draggable 
+                      onDragStart={(e) => handleDragStart(e, idx)} 
+                      onDragOver={(e) => handleDragOver(e, idx)} 
+                      onDrop={(e) => handleDrop(e, idx)}
+                      onDragEnd={handleDragEnd} 
+                      className={`flex items-center gap-2 bg-slate-950 p-2 rounded-xl border transition ${draggedOverIndex === idx ? 'border-orange-500 bg-slate-800/50' : 'border-slate-800'} ${draggedIndex === idx ? 'opacity-50' : ''}`}
+                    >
                       <div className="cursor-grab text-slate-500 hover:text-slate-300 p-1"><Icon name="GripVertical" size={16} /></div>
                       <input type="text" placeholder="세부 행동 단계" value={m.title} onChange={(e) => handleUpdateMilestone(m.id, 'title', e.target.value)} className="flex-1 bg-transparent text-xs text-white focus:outline-none" />
                       <input type="date" value={m.deadline} onChange={(e) => handleUpdateMilestone(m.id, 'deadline', e.target.value)} className="bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded px-2 py-1 focus:outline-none" />
@@ -1321,7 +1365,13 @@
       };
 
       const handleSaveGoal = async (goal) => {
-        const saved = await api.data.saveGoal(user.id, goal);
+        const sanitizedGoal = {
+           ...goal,
+           title: sanitize(goal.title),
+           category: sanitize(goal.category),
+           milestones: goal.milestones?.map(m => ({ ...m, title: sanitize(m.title) }))
+        };
+        const saved = await api.data.saveGoal(user.id, sanitizedGoal);
         setGoals(prev => {
           const idx = prev.findIndex(g => g.id === saved.id);
           if (idx >= 0) { const updated = [...prev]; updated[idx] = saved; return updated; }
@@ -1337,12 +1387,43 @@
       
       const handleDeleteGoal = async (goalId) => { await api.data.deleteGoal(goalId); setGoals(prev => prev.filter(g => g.id !== goalId)); };
 
-      const handleSavePlan = async (plan) => { const saved = await api.data.savePlan(user.id, plan); setPlans(prev => [saved, ...prev]); return saved; };
-      const handleUpdatePlan = async (plan) => { const saved = await api.data.savePlan(user.id, plan); setPlans(prev => prev.map(p => p.id === saved.id ? saved : p)); };
+      const handleSavePlan = async (plan) => { 
+        const sanitizedPlan = {
+           ...plan,
+           actionText: sanitize(plan.actionText),
+           timeText: sanitize(plan.timeText),
+           timeMemo: sanitize(plan.timeMemo),
+           blockerText: sanitize(plan.blockerText),
+           solutionText: sanitize(plan.solutionText),
+           notes: sanitize(plan.notes)
+        };
+        const saved = await api.data.savePlan(user.id, sanitizedPlan); 
+        setPlans(prev => [saved, ...prev]); 
+        return saved; 
+      };
+
+      const handleUpdatePlan = async (plan) => { 
+        const sanitizedPlan = {
+           ...plan,
+           actionText: sanitize(plan.actionText),
+           timeText: sanitize(plan.timeText),
+           timeMemo: sanitize(plan.timeMemo),
+           blockerText: sanitize(plan.blockerText),
+           solutionText: sanitize(plan.solutionText),
+           notes: sanitize(plan.notes)
+        };
+        const saved = await api.data.savePlan(user.id, sanitizedPlan); 
+        setPlans(prev => prev.map(p => p.id === saved.id ? saved : p)); 
+      };
+
       const handleDeletePlan = async (planId) => { await api.data.deletePlan(planId); setPlans(prev => prev.filter(p => p.id !== planId)); };
 
       const handleSaveHabit = async (habit) => {
-        const saved = await api.data.saveHabit(user.id, habit);
+        const sanitizedHabit = {
+           ...habit,
+           title: sanitize(habit.title)
+        };
+        const saved = await api.data.saveHabit(user.id, sanitizedHabit);
         if (saved) {
           const refreshedHabits = await api.data.getHabits(user.id);
           if (refreshedHabits !== null) setHabits(refreshedHabits);
@@ -1352,10 +1433,22 @@
       const handleDeleteHabit = async (habitId) => { await api.data.deleteHabit(habitId); setHabits(prev => prev.filter(h => h.id !== habitId)); };
       
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
+        const previousLogs = [...habitLogs];
+        
+        // Optimistic Update (낙관적 UI 업데이트)
+        if (isCompleted) {
+          setHabitLogs(prev => prev.filter(log => !(log.habitId === habitId && log.date === dateStr)));
+        } else {
+          setHabitLogs(prev => [...prev, { id: crypto.randomUUID(), habitId, userId: user.id, date: dateStr }]);
+        }
+
         const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
-        if (result && !result.error) {
-           const refreshedLogs = await api.data.getHabitLogs(user.id);
-           if (refreshedLogs !== null) setHabitLogs(refreshedLogs);
+        
+        // 에러 발생 시 원래 상태로 롤백
+        if (result && result.error) {
+           console.error("Optimistic update failed:", result.error);
+           alert('체크 상태 저장에 실패했습니다.');
+           setHabitLogs(previousLogs);
         }
       };
 
