@@ -217,7 +217,7 @@
       data: {
         getGoals: async (userId) => {
           if (!supabase) return null;
-          const { data, error } = await supabase.from('goals').select('*').eq('user_id', userId);
+          const { data, error } = await supabase.from('goals').select('*').eq('userId', userId);
           if (error) {
             console.error("getGoals error:", error);
             alert(`목표 데이터를 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
@@ -227,8 +227,7 @@
         },
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
-          const dbPayload = { ...goal, user_id: userId };
-          delete dbPayload.userId; // UI에서 사용된 camelCase 정리
+          const dbPayload = { ...goal, userId: userId };
           
           try {
             if (goal.id) {
@@ -258,7 +257,7 @@
         },
         getPlans: async (userId) => {
           if (!supabase) return null;
-          const { data, error } = await supabase.from('plans').select('*').eq('user_id', userId);
+          const { data, error } = await supabase.from('plans').select('*').eq('userId', userId);
           if (error) {
             console.error("getPlans error:", error);
             alert(`계획 데이터를 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
@@ -268,8 +267,7 @@
         },
         savePlan: async (userId, plan) => {
           if (!supabase) return plan;
-          const dbPayload = { ...plan, user_id: userId };
-          delete dbPayload.userId; // UI에서 사용된 camelCase 정리
+          const dbPayload = { ...plan, userId: userId };
 
           try {
             if (plan.id) {
