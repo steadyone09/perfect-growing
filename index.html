@@ -59,6 +59,37 @@
       return <span ref={spanRef} className={`inline-flex items-center justify-center ${className}`} />;
     };
 
+    // 한글 입력 씹힘(IME) 방지용 Blur 기반 Input/Textarea 컴포넌트
+    const BlurInput = ({ value, onChange, placeholder, type = "text", className }) => {
+      const [localValue, setLocalValue] = React.useState(value || '');
+      React.useEffect(() => { setLocalValue(value || ''); }, [value]);
+      return (
+        <input
+          type={type}
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={className}
+        />
+      );
+    };
+
+    const BlurTextarea = ({ value, onChange, placeholder, rows = 2, className }) => {
+      const [localValue, setLocalValue] = React.useState(value || '');
+      React.useEffect(() => { setLocalValue(value || ''); }, [value]);
+      return (
+        <textarea
+          rows={rows}
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={className}
+        />
+      );
+    };
+
     const getKSTYYYYMMDD = (dateVal) => {
       const d = new Date(dateVal);
       const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
@@ -214,7 +245,7 @@
         },
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
-          const dbPayload = { ...goal, userId: userId }; // userId 컬럼 매핑 고정
+          const dbPayload = { ...goal, userId: userId };
           try {
             if (goal.id) {
               const { data, error } = await supabase.from('goals').update(dbPayload).eq('id', goal.id).select();
@@ -253,18 +284,24 @@
         },
         savePlan: async (userId, plan) => {
           if (!supabase) return plan;
-          const dbPayload = { ...plan, userId: userId }; // userId 컬럼 매핑 고정
+          // DB 스키마에 없는 timeMemo는 제외하여 에러 방지
+          const { timeMemo, ...restPlan } = plan;
+          const dbPayload = { ...restPlan, userId: userId };
           try {
+            let resultData;
             if (plan.id) {
               const { data, error } = await supabase.from('plans').update(dbPayload).eq('id', plan.id).select();
               if (error) throw error;
-              return data[0];
+              resultData = data[0];
             } else {
               dbPayload.id = crypto.randomUUID();
               const { data, error } = await supabase.from('plans').insert(dbPayload).select();
               if (error) throw error;
-              return data[0];
+              resultData = data[0];
             }
+            // timeMemo는 캘린더 생성(모달)을 위해 UI 객체에만 임시로 다시 붙여줌
+            if (timeMemo) resultData.timeMemo = timeMemo;
+            return resultData;
           } catch (error) {
             console.error("savePlan error:", error);
             alert(`계획 저장 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
@@ -852,7 +889,7 @@
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
                   <p><span className="text-slate-400">목표:</span> <strong className="text-white">{savedPlanData.goal?.title}</strong></p>
                   <p><span className="text-slate-400">실행 행동:</span> <strong className="text-white">{savedPlanData.plan.actionText}</strong></p>
-                  <p><span className="text-slate-400">시간/메모:</span> <strong className="text-white">{savedPlanData.plan.timeText} ({formatTime(savedPlanData.plan.durationPlanned)}) {savedPlanData.plan.timeMemo && `- ${savedPlanData.plan.timeMemo}`}</strong></p>
+                  <p><span className="text-slate-400">수행 시점:</span> <strong className="text-white">{savedPlanData.plan.timeText} ({formatTime(savedPlanData.plan.durationPlanned)}) {savedPlanData.plan.timeMemo && `- ${savedPlanData.plan.timeMemo}`}</strong></p>
                 </div>
                 <div className="pt-2 border-t border-slate-800">
                   <label className="block text-xs font-medium text-slate-400 mb-2">스마트폰 캘린더 알람 등록</label>
@@ -1041,7 +1078,13 @@
                       </div>
                       <div>
                         <label className="text-slate-400 block mb-1">실제 투입 시간(분)</label>
-                        <input type="number" value={plan.durationActual || ''} onChange={(e) => onUpdatePlan({ ...plan, durationActual: parseInt(e.target.value, 10) || 0 })} placeholder="분 단위 입력" className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-white focus:outline-none focus:border-orange-500 transition" />
+                        <BlurInput 
+                          type="number" 
+                          value={plan.durationActual} 
+                          onChange={(val) => onUpdatePlan({ ...plan, durationActual: parseInt(val, 10) || 0 })} 
+                          placeholder="분 단위 입력" 
+                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-white focus:outline-none focus:border-orange-500 transition" 
+                        />
                       </div>
                       <div>
                         <label className="text-slate-400 block mb-1">달성 여부</label>
@@ -1053,7 +1096,13 @@
 
                     <div>
                       <label className="block text-xs font-medium text-slate-400 mb-1">결과물 메모 및 복기</label>
-                      <textarea rows="2" value={plan.notes || ''} onChange={(e) => onUpdatePlan({ ...plan, notes: e.target.value })} placeholder="오늘의 성과나 피드백을 자유롭게 기록하세요." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500" />
+                      <BlurTextarea 
+                        rows="2" 
+                        value={plan.notes} 
+                        onChange={(val) => onUpdatePlan({ ...plan, notes: val })} 
+                        placeholder="오늘의 성과나 피드백을 자유롭게 기록하세요." 
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500" 
+                      />
                     </div>
                   </div>
                 );
@@ -1389,7 +1438,6 @@
             return [...prev, saved];
           });
         } catch(e) {
-          // api.data 헬퍼 내부에 alert 처리되어 있음
           console.error(e);
         }
       };
