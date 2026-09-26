@@ -232,13 +232,14 @@
       data: {
         getGoals: async (userId) => {
           if (!supabase) return [];
-          const { data, error } = await supabase.from('goals').select('*').eq('userId', userId);
-          if (error) { window.customAlert(`목표 조회 실패: ${error.message}`); throw error; }
+          const { data, error } = await supabase.from('goals').select('*').eq('user_id', userId);
+          if (error) { window.customAlert(`목표 조회 실패: ${error.message} / ${error.details || ''}`); throw error; }
           return data || [];
         },
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
-          const dbPayload = { ...goal, userId: userId };
+          const dbPayload = { ...goal, user_id: userId };
+          delete dbPayload.userId;
           if (goal.id) {
             const { data, error } = await supabase.from('goals').update(dbPayload).eq('id', goal.id).select();
             if (error) { window.customAlert(`목표 수정 실패: ${error.message}`); throw error; }
@@ -257,14 +258,14 @@
         },
         getPlans: async (userId) => {
           if (!supabase) return [];
-          const { data, error } = await supabase.from('plans').select('*').eq('userId', userId);
+          const { data, error } = await supabase.from('plans').select('*').eq('user_id', userId);
           if (error) { window.customAlert(`계획 조회 실패: ${error.message}`); throw error; }
           return data || [];
         },
         savePlan: async (userId, plan) => {
           if (!supabase) return plan;
-          const { timeMemo, ...restPlan } = plan; 
-          const dbPayload = { ...restPlan, userId: userId };
+          const { timeMemo, userId: _, ...restPlan } = plan; 
+          const dbPayload = { ...restPlan, user_id: userId };
           let resultData;
           if (plan.id) {
             const { data, error } = await supabase.from('plans').update(dbPayload).eq('id', plan.id).select();
@@ -398,6 +399,44 @@
             const { error } = await supabase.from('expenses').update({ is_receipted: isReceipted }).eq('id', expenseId);
             if (error) throw error;
           } catch (error) { window.customAlert(`영수 상태 변경 실패: ${error.message}`); throw error; }
+        },
+        /* 메모 기능 데이터 통신 (Memos) */
+        getMemos: async (userId) => {
+          if (!supabase) return [];
+          try {
+            const { data, error } = await supabase.from('memos').select('*').eq('user_id', userId).order('sort_order', { ascending: true });
+            if (error) throw error;
+            return data || [];
+          } catch (error) { console.error('메모 조회 에러:', error); return []; }
+        },
+        saveMemo: async (userId, memo) => {
+          if (!supabase) return memo;
+          try {
+            const dbPayload = { user_id: userId, title: memo.title, content: memo.content, date: memo.date, sort_order: memo.sort_order || 0 };
+            if (memo.id) {
+              const { data, error } = await supabase.from('memos').update(dbPayload).eq('id', memo.id).select();
+              if (error) throw error;
+              return data[0];
+            } else {
+              dbPayload.id = crypto.randomUUID();
+              const { data, error } = await supabase.from('memos').insert(dbPayload).select();
+              if (error) throw error;
+              return data[0];
+            }
+          } catch (error) { window.customAlert(`메모 저장 실패: ${error.message}`); throw error; }
+        },
+        deleteMemo: async (memoId) => {
+          if (!supabase) return;
+          try {
+            const { error } = await supabase.from('memos').delete().eq('id', memoId);
+            if (error) throw error;
+          } catch (error) { window.customAlert(`메모 삭제 실패: ${error.message}`); throw error; }
+        },
+        updateMemoOrders: async (memos) => {
+          if (!supabase || !memos || memos.length === 0) return;
+          try {
+            await Promise.all(memos.map((m, idx) => supabase.from('memos').update({ sort_order: idx }).eq('id', m.id)));
+          } catch (error) { console.error('메모 순서 저장 에러:', error); }
         }
       }
     };
@@ -571,6 +610,7 @@
       const handleAddMilestone = () => setMilestones([...milestones, { id: crypto.randomUUID(), title: '', deadline: '', completed: false }]);
       const handleUpdateMilestone = (id, field, value) => setMilestones(milestones.map(m => m.id === id ? { ...m, [field]: value } : m));
       const handleRemoveMilestone = (id) => setMilestones(milestones.filter(m => m.id !== id));
+      
       const handleDragStart = (e, index) => { setDraggedIndex(index); e.dataTransfer.effectAllowed = "move"; };
       const handleDragOver = (e, index) => { e.preventDefault(); if (draggedIndex !== null && draggedIndex !== index) setDraggedOverIndex(index); };
       const handleDrop = (e, index) => {
@@ -1255,20 +1295,165 @@
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">종합 달성률</span><span className="text-3xl font-black text-orange-400">{completionRate}%</span><p className="text-[10px] text-slate-500 mt-2">총 {plans.length}개 계획 중 {completedPlans.length}개 완료</p></div>
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">계획된 목표 시간</span><span className="text-3xl font-black text-white">{formatTime(totalPlannedTime)}</span></div>
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">실제 순수 투입 시간</span><span className="text-3xl font-black text-emerald-400">{formatTime(totalActualTime)}</span></div>
-          </div>
         </div>
+      </div>
       );
     };
 
-    const App = () => {
-      const [user, setUser] = React.useState(null);
-      const [currentTab, setCurrentTab] = React.useState('goals');
+    const MemoModal = ({ isOpen, onClose, onSave, memo }) => {
+      const [title, setTitle] = React.useState('');
+      const [content, setContent] = React.useState('');
+      const [date, setDate] = React.useState(getKSTYYYYMMDD(new Date()));
+      const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+      React.useEffect(() => {
+        if (memo) {
+          setTitle(memo.title || '');
+          setContent(memo.content || '');
+          setDate(memo.date || getKSTYYYYMMDD(new Date()));
+        } else {
+          setTitle('');
+          setContent('');
+          setDate(getKSTYYYYMMDD(new Date()));
+        }
+        setIsSubmitting(false);
+      }, [memo, isOpen]);
+
+      if (!isOpen) return null;
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+          await onSave({ id: memo?.id, title, content, date, sort_order: memo?.sort_order });
+          onClose();
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      return (
+        <CustomModal isOpen={isOpen} title={memo ? "메모 수정" : "새 메모 작성"} onClose={onClose}>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">메모 제목</label>
+              <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목을 입력하세요" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">작성 일자</label>
+              <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">메모 내용</label>
+              <textarea required rows="6" value={content} onChange={(e) => setContent(e.target.value)} placeholder="내용을 자세히 기록하세요..." className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500 custom-scrollbar"></textarea>
+            </div>
+            <div className="pt-2 flex justify-end gap-2 border-t border-slate-800">
+              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-lg disabled:opacity-50">취소</button>
+              <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-lg shadow-lg shadow-orange-600/20 disabled:opacity-50">{isSubmitting ? '저장 중...' : '저장하기'}</button>
+            </div>
+          </form>
+        </CustomModal>
+      );
+    };
+
+    const MemoView = ({ memos, onSaveMemo, onDeleteMemo, onUpdateOrders }) => {
+      const [isModalOpen, setIsModalOpen] = React.useState(false);
+      const [selectedMemo, setSelectedMemo] = React.useState(null);
+      const [memoToDelete, setMemoToDelete] = React.useState(null);
+      const [isDeleting, setIsDeleting] = React.useState(false);
+      
+      const [localMemos, setLocalMemos] = React.useState([]);
+      const [draggedIndex, setDraggedIndex] = React.useState(null);
+      const [draggedOverIndex, setDraggedOverIndex] = React.useState(null);
+
+      React.useEffect(() => {
+        setLocalMemos([...memos]);
+      }, [memos]);
+
+      const confirmDelete = async () => {
+        if (memoToDelete) {
+          setIsDeleting(true);
+          try { await onDeleteMemo(memoToDelete); } 
+          finally { setMemoToDelete(null); setIsDeleting(false); setIsModalOpen(false); }
+        }
+      };
+
+      const handleDragStart = (e, index) => { setDraggedIndex(index); e.dataTransfer.effectAllowed = "move"; };
+      const handleDragOver = (e, index) => { e.preventDefault(); if (draggedIndex !== null && draggedIndex !== index) setDraggedOverIndex(index); };
+      const handleDrop = (e, index) => {
+        e.preventDefault();
+        if (draggedIndex === null || draggedIndex === index) return;
+        const updated = [...localMemos]; 
+        const item = updated.splice(draggedIndex, 1)[0]; 
+        updated.splice(index, 0, item);
+        setLocalMemos(updated);
+        onUpdateOrders(updated);
+        setDraggedIndex(null); 
+        setDraggedOverIndex(null);
+      };
+      const handleDragEnd = () => { setDraggedIndex(null); setDraggedOverIndex(null); };
+
+      return (
+        <div className="space-y-6 relative z-10">
+          <ConfirmModal isOpen={!!memoToDelete} message="메모를 완전히 삭제하시겠습니까?" onConfirm={confirmDelete} onClose={() => setMemoToDelete(null)} isProcessing={isDeleting} />
+          <MemoModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={onSaveMemo} memo={selectedMemo} />
+          
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Icon name="FileText" size={20} className="text-orange-500"/> 자유 메모</h2>
+              <p className="text-xs text-slate-400">자유롭게 아이디어를 기록하고 드래그하여 순서를 변경하세요.</p>
+            </div>
+            <button onClick={() => { setSelectedMemo(null); setIsModalOpen(true); }} className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-xl flex items-center gap-1.5 shadow-lg shadow-orange-600/20"><Icon name="Plus" size={16} /> 새 메모</button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {localMemos.length === 0 ? (
+               <div className="col-span-full py-12 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl">
+                 <Icon name="FileText" size={40} className="text-slate-600 mb-2 mx-auto" />
+                 <p className="text-sm text-slate-400">등록된 메모가 없습니다.</p>
+               </div>
+            ) : (
+              localMemos.map((memo, idx) => (
+                <div 
+                  key={memo.id} 
+                  draggable 
+                  onDragStart={(e) => handleDragStart(e, idx)} 
+                  onDragOver={(e) => handleDragOver(e, idx)} 
+                  onDrop={(e) => handleDrop(e, idx)} 
+                  onDragEnd={handleDragEnd}
+                  className={`bg-slate-900 border border-slate-800 p-5 rounded-2xl transition flex flex-col justify-between cursor-pointer hover:border-slate-700 relative group 
+                    ${draggedOverIndex === idx ? 'border-orange-500 bg-slate-800/50' : ''} 
+                    ${draggedIndex === idx ? 'opacity-50' : ''}`}
+                  onClick={() => { setSelectedMemo(memo); setIsModalOpen(true); }}
+                >
+                  <div className="absolute top-4 right-4 text-slate-600 group-hover:text-slate-400 transition cursor-grab"><Icon name="GripHorizontal" size={16}/></div>
+                  <div>
+                    <h3 className="font-bold text-base text-white mb-2 pr-6 line-clamp-1 group-hover:text-orange-400 transition">{memo.title}</h3>
+                    <p className="text-xs text-slate-400 line-clamp-3 mb-4">{memo.content}</p>
+                  </div>
+                  <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
+                <span>{memo.date}</span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setMemoToDelete(memo.id); }} className="hover:text-red-400 p-1 transition rounded"><Icon name="Trash2" size={14} /></button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+const App = () => {
+  const [user, setUser] = React.useState(null);
+  const [currentTab, setCurrentTab] = React.useState('goals');
       const [isLoading, setIsLoading] = React.useState(true);
       
       const [goals, setGoals] = React.useState([]);
       const [plans, setPlans] = React.useState([]);
       const [habits, setHabits] = React.useState([]);
       const [habitLogs, setHabitLogs] = React.useState([]);
+      const [memos, setMemos] = React.useState([]);
       const [isResetModalOpen, setIsResetModalOpen] = React.useState(false);
       
       const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
@@ -1299,7 +1484,7 @@
         if (supabase) {
           const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session?.user && mounted) { setUser(session.user); await loadUserData(session.user.id); } 
-            else if (event === 'SIGNED_OUT' && mounted) { setUser(null); setGoals([]); setPlans([]); setHabits([]); setHabitLogs([]); setIsLoading(false); }
+            else if (event === 'SIGNED_OUT' && mounted) { setUser(null); setGoals([]); setPlans([]); setHabits([]); setHabitLogs([]); setMemos([]); setIsLoading(false); }
           });
           authListener = data;
         }
@@ -1309,8 +1494,14 @@
       const loadUserData = async (userId) => {
         setIsLoading(true);
         try {
-          const [userGoals, userPlans, userHabits, userHabitLogs] = await Promise.all([ api.data.getGoals(userId), api.data.getPlans(userId), api.data.getHabits(userId), api.data.getHabitLogs(userId) ]);
-          setGoals(userGoals); setPlans(userPlans); setHabits(userHabits); setHabitLogs(userHabitLogs);
+          const [userGoals, userPlans, userHabits, userHabitLogs, userMemos] = await Promise.all([ 
+            api.data.getGoals(userId), 
+            api.data.getPlans(userId), 
+            api.data.getHabits(userId), 
+            api.data.getHabitLogs(userId),
+            api.data.getMemos(userId)
+          ]);
+          setGoals(userGoals); setPlans(userPlans); setHabits(userHabits); setHabitLogs(userHabitLogs); setMemos(userMemos);
         } catch (e) {} finally { setIsLoading(false); }
       };
 
@@ -1340,6 +1531,16 @@
         else setHabitLogs(prev => [...prev, { id: crypto.randomUUID(), habitId, userId: user.id, date: dateStr }]);
         const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
         if (result && result.error) setHabitLogs(previousLogs);
+      };
+
+      const handleSaveMemo = async (memo) => {
+        try { const saved = await api.data.saveMemo(user.id, memo); setMemos(prev => prev.findIndex(m => m.id === saved.id) >= 0 ? prev.map(m => m.id === saved.id ? saved : m).sort((a,b)=>a.sort_order - b.sort_order) : [...prev, saved].sort((a,b)=>a.sort_order - b.sort_order)); }
+        catch (e) {}
+      };
+      const handleDeleteMemo = async (memoId) => { try { await api.data.deleteMemo(memoId); setMemos(prev => prev.filter(m => m.id !== memoId)); } catch(e) {} };
+      const handleUpdateMemoOrders = async (updatedMemos) => {
+        setMemos(updatedMemos);
+        api.data.updateMemoOrders(updatedMemos);
       };
 
       if (isLoading) {
@@ -1387,9 +1588,9 @@
                       <button onClick={() => { setCurrentTab('finance'); setIsDropdownOpen(false); }} className="w-full text-left px-4 py-3 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition">
                         <Icon name="DollarSign" size={15} /> 가계부 관리
                       </button>
-                      <div className="w-full text-left px-4 py-3 text-xs text-slate-500 flex items-center gap-2 bg-slate-900/50 cursor-not-allowed">
-                        <Icon name="FileText" size={15} /> 메모 (준비중)
-                      </div>
+                      <button onClick={() => { setCurrentTab('memo'); setIsDropdownOpen(false); }} className="w-full text-left px-4 py-3 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition">
+                        <Icon name="FileText" size={15} /> 자유 메모
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1407,6 +1608,7 @@
             {currentTab === 'habits' && <HabitsView habits={habits} habitLogs={habitLogs} onSaveHabit={handleSaveHabit} onDeleteHabit={handleDeleteHabit} onToggleHabitLog={handleToggleHabitLog} />}
             {currentTab === 'stats' && <StatsView plans={plans} goals={goals} />}
             {currentTab === 'finance' && <FinanceView user={user} />}
+            {currentTab === 'memo' && <MemoView memos={memos} onSaveMemo={handleSaveMemo} onDeleteMemo={handleDeleteMemo} onUpdateOrders={handleUpdateMemoOrders} />}
           </main>
 
           <ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} />
