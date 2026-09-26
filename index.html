@@ -15,6 +15,14 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Supabase JS SDK CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
 </head>
 <body class="bg-black text-slate-100 min-h-screen selection:bg-orange-500 selection:text-white relative">
   <div id="root"></div>
@@ -35,11 +43,30 @@
       console.warn("Supabase 클라이언트 생성 경고:", e.message);
     }
 
+    // 커스텀 토스트 알림 (기본 alert 대체)
+    window.customAlert = (msg) => {
+      const container = document.getElementById('toast-container') || (() => {
+        const c = document.createElement('div');
+        c.id = 'toast-container';
+        c.className = 'fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[90%] max-w-sm';
+        document.body.appendChild(c);
+        return c;
+      })();
+      const toast = document.createElement('div');
+      toast.className = 'bg-slate-800 border border-slate-700 text-slate-100 px-5 py-3 rounded-xl shadow-2xl flex items-start gap-3 text-sm animate-fadeIn break-all';
+      toast.innerHTML = `<svg class="shrink-0 mt-0.5" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> <div>${msg}</div>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    };
+
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     const Icon = ({ name, size = 20, className = "" }) => {
       const spanRef = React.useRef(null);
-      
       React.useEffect(() => {
         if (spanRef.current && window.lucide && window.lucide.icons[name]) {
           spanRef.current.innerHTML = '';
@@ -55,11 +82,9 @@
           }
         }
       }, [name, size, className]);
-
       return <span ref={spanRef} className={`inline-flex items-center justify-center ${className}`} />;
     };
 
-    // 한글 입력 씹힘(IME) 방지용 Blur 기반 Input/Textarea 컴포넌트
     const BlurInput = ({ value, onChange, placeholder, type = "text", className }) => {
       const [localValue, setLocalValue] = React.useState(value || '');
       React.useEffect(() => { setLocalValue(value || ''); }, [value]);
@@ -116,9 +141,7 @@
         let timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
         
         let startDate = new Date(`${dateStr}T${timeStr}:00`);
-        if (isNaN(startDate.getTime())) {
-          startDate = new Date(`${dateStr}T12:00:00`);
-        }
+        if (isNaN(startDate.getTime())) startDate = new Date(`${dateStr}T12:00:00`);
 
         const duration = parseInt(plan.durationPlanned, 10) || 30;
         const endDate = new Date(startDate.getTime() + duration * 60000);
@@ -137,24 +160,13 @@
       }
     };
 
-    const escapeICS = (str) => {
-      if (!str) return '';
-      return str.toString()
-        .replace(/\\/g, '\\\\')
-        .replace(/;/g, '\\;')
-        .replace(/,/g, '\\,')
-        .replace(/\n/g, '\\n');
-    };
-
     const generateCalendarICS = (plan, goal) => {
       try {
         const dateStr = plan.date || getKSTYYYYMMDD(new Date());
         let timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
         
         let startDate = new Date(`${dateStr}T${timeStr}:00`);
-        if (isNaN(startDate.getTime())) {
-          startDate = new Date(`${dateStr}T12:00:00`);
-        }
+        if (isNaN(startDate.getTime())) startDate = new Date(`${dateStr}T12:00:00`);
 
         const duration = parseInt(plan.durationPlanned, 10) || 30;
         const endDate = new Date(startDate.getTime() + duration * 60000);
@@ -164,28 +176,20 @@
         const dtEnd = formatICSDate(endDate);
         const dtStamp = formatICSDate(new Date());
         
+        const escapeICS = (str) => {
+          if (!str) return '';
+          return str.toString().replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+        };
+
         const summary = escapeICS(`[${goal?.title || '최강 목표'}] 실행 계획: ${plan.actionText}`);
         const description = escapeICS(`실행 내용: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 메모: ' + plan.timeMemo : ''}`);
 
         const icsContent = [
-          'BEGIN:VCALENDAR',
-          'VERSION:2.0',
-          'PRODID:-//Goal Tracker//KR',
-          'CALSCALE:GREGORIAN',
-          'BEGIN:VEVENT',
-          `UID:${crypto.randomUUID()}@goaltracker`,
-          `DTSTAMP:${dtStamp}`,
-          `DTSTART:${dtStart}`,
-          `DTEND:${dtEnd}`,
-          `SUMMARY:${summary}`,
-          `DESCRIPTION:${description}`,
-          'BEGIN:VALARM',
-          'TRIGGER:-PT10M',
-          'ACTION:DISPLAY',
-          'DESCRIPTION:Reminder',
-          'END:VALARM',
-          'END:VEVENT',
-          'END:VCALENDAR'
+          'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Goal Tracker//KR', 'CALSCALE:GREGORIAN',
+          'BEGIN:VEVENT', `UID:${crypto.randomUUID()}@goaltracker`, `DTSTAMP:${dtStamp}`, `DTSTART:${dtStart}`, `DTEND:${dtEnd}`,
+          `SUMMARY:${summary}`, `DESCRIPTION:${description}`,
+          'BEGIN:VALARM', 'TRIGGER:-PT10M', 'ACTION:DISPLAY', 'DESCRIPTION:Reminder', 'END:VALARM',
+          'END:VEVENT', 'END:VCALENDAR'
         ].join('\r\n');
 
         const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
@@ -223,22 +227,16 @@
           const { data: sessionData } = await supabase.auth.getSession();
           if (!sessionData?.session) return null;
           const { data, error } = await supabase.auth.getUser();
-          if (error) {
-            if (error.name !== 'AuthSessionMissingError' && error.message !== 'Auth session missing!') {
-              console.error("GetUser Error:", error);
-            }
-            return null;
-          }
+          if (error) return null;
           return data?.user || null;
         }
       },
       data: {
         getGoals: async (userId) => {
-          if (!supabase) return null;
+          if (!supabase) return [];
           const { data, error } = await supabase.from('goals').select('*').eq('userId', userId);
           if (error) {
-            console.error("getGoals error:", error);
-            alert(`목표 데이터를 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
+            window.customAlert(`목표 조회 실패: ${error.message}\n상세: ${error.details || '없음'}`);
             throw error;
           }
           return data || [];
@@ -246,166 +244,143 @@
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
           const dbPayload = { ...goal, userId: userId };
-          try {
-            if (goal.id) {
-              const { data, error } = await supabase.from('goals').update(dbPayload).eq('id', goal.id).select();
-              if (error) throw error;
-              return data[0];
-            } else {
-              dbPayload.id = crypto.randomUUID();
-              const { data, error } = await supabase.from('goals').insert(dbPayload).select();
-              if (error) throw error;
-              return data[0];
+          if (goal.id) {
+            const { data, error } = await supabase.from('goals').update(dbPayload).eq('id', goal.id).select();
+            if (error) {
+              window.customAlert(`목표 수정 실패: ${error.message}\n상세: ${error.details || '없음'}`);
+              throw error;
             }
-          } catch (error) {
-            console.error("saveGoal error:", error);
-            alert(`목표 저장 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
-            throw error;
+            return data[0];
+          } else {
+            dbPayload.id = crypto.randomUUID();
+            const { data, error } = await supabase.from('goals').insert(dbPayload).select();
+            if (error) {
+              window.customAlert(`목표 저장 실패: ${error.message}\n상세: ${error.details || '없음'}`);
+              throw error;
+            }
+            return data[0];
           }
         },
         deleteGoal: async (goalId) => {
           if (!supabase) return;
           const { error } = await supabase.from('goals').delete().eq('id', goalId);
           if (error) {
-            console.error("deleteGoal error:", error);
-            alert(`목표 삭제 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
+            window.customAlert(`목표 삭제 실패: ${error.message}\n상세: ${error.details || '없음'}`);
             throw error;
           }
         },
         getPlans: async (userId) => {
-          if (!supabase) return null;
+          if (!supabase) return [];
           const { data, error } = await supabase.from('plans').select('*').eq('userId', userId);
           if (error) {
-            console.error("getPlans error:", error);
-            alert(`계획 데이터를 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
+            window.customAlert(`계획 조회 실패: ${error.message}\n상세: ${error.details || '없음'}`);
             throw error;
           }
           return data || [];
         },
         savePlan: async (userId, plan) => {
           if (!supabase) return plan;
-          // DB 스키마에 없는 timeMemo는 제외하여 에러 방지
-          const { timeMemo, ...restPlan } = plan;
+          const { timeMemo, ...restPlan } = plan; 
           const dbPayload = { ...restPlan, userId: userId };
-          try {
-            let resultData;
-            if (plan.id) {
-              const { data, error } = await supabase.from('plans').update(dbPayload).eq('id', plan.id).select();
-              if (error) throw error;
-              resultData = data[0];
-            } else {
-              dbPayload.id = crypto.randomUUID();
-              const { data, error } = await supabase.from('plans').insert(dbPayload).select();
-              if (error) throw error;
-              resultData = data[0];
+          let resultData;
+          if (plan.id) {
+            const { data, error } = await supabase.from('plans').update(dbPayload).eq('id', plan.id).select();
+            if (error) {
+              window.customAlert(`계획 수정 실패: ${error.message}\n상세: ${error.details || '없음'}`);
+              throw error;
             }
-            // timeMemo는 캘린더 생성(모달)을 위해 UI 객체에만 임시로 다시 붙여줌
-            if (timeMemo) resultData.timeMemo = timeMemo;
-            return resultData;
-          } catch (error) {
-            console.error("savePlan error:", error);
-            alert(`계획 저장 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
-            throw error;
+            resultData = data[0];
+          } else {
+            dbPayload.id = crypto.randomUUID();
+            const { data, error } = await supabase.from('plans').insert(dbPayload).select();
+            if (error) {
+              window.customAlert(`계획 저장 실패: ${error.message}\n상세: ${error.details || '없음'}`);
+              throw error;
+            }
+            resultData = data[0];
           }
+          if (timeMemo) resultData.timeMemo = timeMemo;
+          return resultData;
         },
         deletePlan: async (planId) => {
           if (!supabase) return;
           const { error } = await supabase.from('plans').delete().eq('id', planId);
           if (error) {
-            console.error("deletePlan error:", error);
-            alert(`계획 삭제 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
+            window.customAlert(`계획 삭제 실패: ${error.message}\n상세: ${error.details || '없음'}`);
             throw error;
           }
         },
         getHabits: async (userId) => {
-          if (!supabase) return null;
+          if (!supabase) return [];
           const { data, error } = await supabase.from('habits').select('*').eq('user_id', userId);
           if (error) {
-            console.error("getHabits error:", error);
-            alert(`습관 데이터를 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
+            window.customAlert(`습관 조회 실패: ${error.message}\n상세: ${error.details || '없음'}`);
             throw error;
           }
           return data.map(d => ({
-            id: d.id,
-            userId: d.user_id,
-            title: d.title,
-            time: d.exec_time,
-            repeatDays: d.repeat_days || []
+            id: d.id, userId: d.user_id, title: d.title, time: d.exec_time, repeatDays: d.repeat_days || []
           }));
         },
         saveHabit: async (userId, habit) => {
           if (!supabase) return habit;
           const parsedRepeatDays = (habit.repeatDays || []).map(d => parseInt(d, 10)).filter(n => !isNaN(n));
           const validTime = habit.time && habit.time.trim() !== '' ? habit.time : null;
-
           const dbPayload = {
-            title: habit.title,
-            exec_time: validTime,
-            repeat_days: parsedRepeatDays,
-            user_id: userId
+            title: habit.title, exec_time: validTime, repeat_days: parsedRepeatDays, user_id: userId
           };
-          
-          try {
-            if (habit.id) {
-              const { data, error } = await supabase.from('habits').update(dbPayload).eq('id', habit.id).select();
-              if (error) throw error;
-              alert('습관이 성공적으로 수정되었습니다!');
-              return { id: data[0].id, userId: data[0].user_id, title: data[0].title, time: data[0].exec_time, repeatDays: data[0].repeat_days };
-            } else {
-              dbPayload.id = crypto.randomUUID();
-              const { data, error } = await supabase.from('habits').insert(dbPayload).select();
-              if (error) throw error;
-              alert('새로운 습관이 등록되었습니다!');
-              return { id: data[0].id, userId: data[0].user_id, title: data[0].title, time: data[0].exec_time, repeatDays: data[0].repeat_days };
+          if (habit.id) {
+            const { data, error } = await supabase.from('habits').update(dbPayload).eq('id', habit.id).select();
+            if (error) {
+              window.customAlert(`습관 수정 실패: ${error.message}\n상세: ${error.details || '없음'}`);
+              throw error;
             }
-          } catch (error) {
-            console.error("saveHabit exception:", error);
-            alert(`습관 저장 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
-            throw error;
+            window.customAlert('습관이 성공적으로 수정되었습니다!');
+            return { id: data[0].id, userId: data[0].user_id, title: data[0].title, time: data[0].exec_time, repeatDays: data[0].repeat_days };
+          } else {
+            dbPayload.id = crypto.randomUUID();
+            const { data, error } = await supabase.from('habits').insert(dbPayload).select();
+            if (error) {
+              window.customAlert(`습관 등록 실패: ${error.message}\n상세: ${error.details || '없음'}`);
+              throw error;
+            }
+            window.customAlert('새로운 습관이 등록되었습니다!');
+            return { id: data[0].id, userId: data[0].user_id, title: data[0].title, time: data[0].exec_time, repeatDays: data[0].repeat_days };
           }
         },
         deleteHabit: async (habitId) => {
           if (!supabase) return;
           const { error } = await supabase.from('habits').delete().eq('id', habitId);
           if (error) {
-            console.error("deleteHabit error:", error);
-            alert(`습관 삭제 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
+            window.customAlert(`습관 삭제 실패: ${error.message}\n상세: ${error.details || '없음'}`);
             throw error;
           }
         },
         getHabitLogs: async (userId) => {
-          if (!supabase) return null;
-          try {
-            const { data, error } = await supabase.from('habit_logs').select('*').eq('user_id', userId);
-            if (error) throw error;
-            return data.map(d => ({
-              id: d.id,
-              habitId: d.habit_id,
-              userId: d.user_id,
-              date: d.date || d.completed_date
-            }));
-          } catch (error) {
-             console.error("getHabitLogs exception:", error);
-             alert(`습관 기록을 불러오는 중 오류가 발생했습니다.\n에러 원인: ${error.message}\n상세: ${error.details || '없음'}`);
-             throw error;
+          if (!supabase) return [];
+          const { data, error } = await supabase.from('habit_logs').select('*').eq('user_id', userId);
+          if (error) {
+            window.customAlert(`습관 기록 조회 실패: ${error.message}\n상세: ${error.details || '없음'}`);
+            throw error;
           }
+          return data.map(d => ({
+            id: d.id, habitId: d.habit_id, userId: d.user_id, date: (d.completed_date || d.date || '').split('T')[0]
+          }));
         },
         toggleHabitLog: async (userId, habitId, dateStr, isCompleted) => {
-          if (!supabase) return null;
+          if (!supabase) return { error: { message: "Supabase 연결 안됨" } };
           try {
             if (isCompleted) {
-              const { error } = await supabase.from('habit_logs')
-                .delete()
-                .match({ habit_id: habitId, completed_date: dateStr, user_id: userId });
+              const { error } = await supabase.from('habit_logs').delete().match({ habit_id: habitId, completed_date: dateStr, user_id: userId });
               if (error) throw error;
               return { success: true, action: 'deleted' };
             } else {
               const newLog = { habit_id: habitId, user_id: userId, completed_date: dateStr, is_completed: true };
-              const { error } = await supabase.from('habit_logs').insert(newLog);
+              const { error } = await supabase.from('habit_logs').upsert(newLog);
               if (error) throw error;
               return { success: true, action: 'inserted' };
             }
           } catch (err) {
+            window.customAlert(`체크 상태 저장 실패: ${err.message}`);
             return { error: err };
           }
         }
@@ -626,17 +601,8 @@
       const handleUpdateMilestone = (id, field, value) => setMilestones(milestones.map(m => m.id === id ? { ...m, [field]: value } : m));
       const handleRemoveMilestone = (id) => setMilestones(milestones.filter(m => m.id !== id));
 
-      const handleDragStart = (e, index) => { 
-        setDraggedIndex(index); 
-        e.dataTransfer.effectAllowed = "move"; 
-      };
-      
-      const handleDragOver = (e, index) => {
-        e.preventDefault();
-        if (draggedIndex === null || draggedIndex === index) return;
-        setDraggedOverIndex(index);
-      };
-      
+      const handleDragStart = (e, index) => { setDraggedIndex(index); e.dataTransfer.effectAllowed = "move"; };
+      const handleDragOver = (e, index) => { e.preventDefault(); if (draggedIndex !== null && draggedIndex !== index) setDraggedOverIndex(index); };
       const handleDrop = (e, index) => {
         e.preventDefault();
         if (draggedIndex === null || draggedIndex === index) return;
@@ -644,14 +610,9 @@
         const item = updated.splice(draggedIndex, 1)[0];
         updated.splice(index, 0, item);
         setMilestones(updated);
-        setDraggedIndex(null);
-        setDraggedOverIndex(null);
+        setDraggedIndex(null); setDraggedOverIndex(null);
       };
-      
-      const handleDragEnd = () => { 
-        setDraggedIndex(null);
-        setDraggedOverIndex(null);
-      };
+      const handleDragEnd = () => { setDraggedIndex(null); setDraggedOverIndex(null); };
 
       const handleSubmit = async (e) => {
         e.preventDefault();
@@ -662,7 +623,7 @@
           await onSave({ id: goal?.id, title, category, deadline, milestones: validMilestones });
           onClose();
         } catch(err) {
-          // api.data handles alert
+          // api.data handles alerts
         } finally {
           setIsSubmitting(false);
         }
@@ -698,12 +659,7 @@
                 {milestones.length === 0 ? <p className="text-xs text-slate-500 text-center py-4">등록된 중간 단계가 없습니다.</p> : (
                   milestones.map((m, idx) => m && m.id ? (
                     <div 
-                      key={m.id} 
-                      draggable 
-                      onDragStart={(e) => handleDragStart(e, idx)} 
-                      onDragOver={(e) => handleDragOver(e, idx)} 
-                      onDrop={(e) => handleDrop(e, idx)}
-                      onDragEnd={handleDragEnd} 
+                      key={m.id} draggable onDragStart={(e) => handleDragStart(e, idx)} onDragOver={(e) => handleDragOver(e, idx)} onDrop={(e) => handleDrop(e, idx)} onDragEnd={handleDragEnd} 
                       className={`flex items-center gap-2 bg-slate-950 p-2 rounded-xl border transition ${draggedOverIndex === idx ? 'border-orange-500 bg-slate-800/50' : 'border-slate-800'} ${draggedIndex === idx ? 'opacity-50' : ''}`}
                     >
                       <div className="cursor-grab text-slate-500 hover:text-slate-300 p-1"><Icon name="GripVertical" size={16} /></div>
@@ -736,14 +692,7 @@
       const confirmDelete = async () => { 
         if (goalToDelete) { 
           setIsDeleting(true);
-          try {
-            await onDeleteGoal(goalToDelete); 
-          } catch(err) {
-            console.error(err);
-          } finally {
-            setGoalToDelete(null);
-            setIsDeleting(false);
-          }
+          try { await onDeleteGoal(goalToDelete); } finally { setGoalToDelete(null); setIsDeleting(false); }
         } 
       };
 
@@ -751,13 +700,7 @@
         e.stopPropagation();
         if (processingIds.has(goal.id)) return;
         setProcessingIds(prev => new Set(prev).add(goal.id));
-        try {
-          await onToggleComplete(goal);
-        } catch(err) {
-          console.error(err);
-        } finally {
-          setProcessingIds(prev => { const next = new Set(prev); next.delete(goal.id); return next; });
-        }
+        try { await onToggleComplete(goal); } finally { setProcessingIds(prev => { const next = new Set(prev); next.delete(goal.id); return next; }); }
       };
 
       const calculateDDay = (deadline) => {
@@ -786,7 +729,7 @@
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {goals.length === 0 ? (
               <div className="col-span-full py-12 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl">
-                <Icon name="Target" size={40} className="text-slate-600 mb-2" />
+                <Icon name="Target" size={40} className="text-slate-600 mb-2 mx-auto" />
                 <p className="text-sm text-slate-400">등록된 목표가 없습니다. 새로운 목표를 세워보세요!</p>
               </div>
             ) : (
@@ -852,32 +795,19 @@
         setIsSubmitting(true);
         try {
           const newPlan = {
-            date: getKSTYYYYMMDD(new Date()),
-            goalId: selectedGoalId,
-            milestoneId: selectedMilestoneId,
-            actionText,
-            timeText,
-            timeMemo,
-            durationPlanned: parseInt(durationPlanned, 10) || 0,
-            hasBlocker,
-            blockerText,
-            solutionText,
-            status: 'planned',
-            durationActual: 0,
-            notes: ''
+            date: getKSTYYYYMMDD(new Date()), goalId: selectedGoalId, milestoneId: selectedMilestoneId,
+            actionText, timeText, timeMemo, durationPlanned: parseInt(durationPlanned, 10) || 0,
+            hasBlocker, blockerText, solutionText, status: 'planned', durationActual: 0, notes: ''
           };
           const saved = await onSavePlan(newPlan);
           setSavedPlanData({ plan: saved || newPlan, goal: activeGoal });
-        } catch(err) {
-          console.error(err);
         } finally {
           setIsSubmitting(false);
         }
       };
 
       const handleCloseModal = () => {
-        setSavedPlanData(null);
-        setSelectedGoalId(''); setSelectedMilestoneId(''); setActionText(''); setTimeText(''); setTimeMemo('');
+        setSavedPlanData(null); setSelectedGoalId(''); setSelectedMilestoneId(''); setActionText(''); setTimeText(''); setTimeMemo('');
         setDurationPlanned(30); setHasBlocker(false); setBlockerText(''); setSolutionText(''); setStep(1);
       };
 
@@ -905,7 +835,7 @@
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
             {step === 1 && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-fadeIn">
                 <span className="text-xs font-bold text-orange-400">Q1. 목표 선택</span>
                 <h3 className="text-lg font-bold text-white">오늘은 어떤 목표를 위해 노력하실 건가요?</h3>
                 <select value={selectedGoalId} onChange={(e) => { setSelectedGoalId(e.target.value); setSelectedMilestoneId(''); }} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500">
@@ -926,7 +856,7 @@
             )}
 
             {step === 2 && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-fadeIn">
                 <span className="text-xs font-bold text-orange-400">Q2. 구체적 행동</span>
                 <h3 className="text-lg font-bold text-white">선택한 목표를 위해 '오늘' 구체적으로 뭘 하실 건가요?</h3>
                 <textarea rows="3" value={actionText} onChange={(e) => setActionText(e.target.value)} placeholder="예: 공식 문서 읽고 실습 2개" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500" />
@@ -938,7 +868,7 @@
             )}
 
             {step === 3 && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-fadeIn">
                 <span className="text-xs font-bold text-orange-400">Q3. 언제 하시겠어요?</span>
                 <h3 className="text-lg font-bold text-white">실행 예정 시간과 상세 메모를 남겨주세요.</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -963,7 +893,7 @@
             )}
 
             {step === 4 && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-fadeIn">
                 <span className="text-xs font-bold text-orange-400">Q4. 장애요인 점검</span>
                 <h3 className="text-lg font-bold text-white">오늘 실행을 방해할 만한 요소가 있나요?</h3>
                 <div className="flex gap-3">
@@ -984,7 +914,7 @@
             )}
 
             {step === 5 && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-fadeIn">
                 <span className="text-xs font-bold text-orange-400">Q5. 최종 확인</span>
                 <h3 className="text-lg font-bold text-white">최종적으로, 방금 세우신 오늘 계획 정말 실천 가능하세요?</h3>
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
@@ -1009,18 +939,12 @@
       const [planToDelete, setPlanToDelete] = React.useState(null);
       const [processingIds, setProcessingIds] = React.useState(new Set());
       const [isDeleting, setIsDeleting] = React.useState(false);
+      const [visibleCount, setVisibleCount] = React.useState(5);
 
       const confirmDelete = async () => { 
         if (planToDelete) { 
           setIsDeleting(true);
-          try {
-            await onDeletePlan(planToDelete); 
-          } catch(err) {
-            console.error(err);
-          } finally {
-            setPlanToDelete(null); 
-            setIsDeleting(false);
-          }
+          try { await onDeletePlan(planToDelete); } finally { setPlanToDelete(null); setIsDeleting(false); }
         } 
       };
 
@@ -1030,12 +954,21 @@
         try {
           const isCompleted = plan.status === 'completed';
           await onUpdatePlan({ ...plan, status: isCompleted ? 'planned' : 'completed' });
-        } catch(err) {
-          console.error(err);
         } finally {
           setProcessingIds(prev => { const next = new Set(prev); next.delete(plan.id); return next; });
         }
       };
+
+      // 최신 생성일(날짜) 기준 내림차순 정렬
+      const sortedPlans = React.useMemo(() => {
+        return [...plans].sort((a, b) => {
+          if (a.date > b.date) return -1;
+          if (a.date < b.date) return 1;
+          return 0;
+        });
+      }, [plans]);
+
+      const visiblePlans = sortedPlans.slice(0, visibleCount);
 
       return (
         <div className="space-y-6 relative z-10">
@@ -1047,66 +980,73 @@
           </div>
 
           <div className="space-y-4">
-            {plans.length === 0 ? (
+            {sortedPlans.length === 0 ? (
               <div className="py-12 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl">
-                <Icon name="Calendar" size={40} className="text-slate-600 mb-2" />
+                <Icon name="Calendar" size={40} className="text-slate-600 mb-2 mx-auto" />
                 <p className="text-sm text-slate-400">저장된 실행 계획이 없습니다.</p>
               </div>
             ) : (
-              plans.map(plan => {
-                const goal = goals.find(g => g.id === plan.goalId);
-                const isCompleted = plan.status === 'completed';
-                const isProcessing = processingIds.has(plan.id);
+              <>
+                {visiblePlans.map(plan => {
+                  const goal = goals.find(g => g.id === plan.goalId);
+                  const isCompleted = plan.status === 'completed';
+                  const isProcessing = processingIds.has(plan.id);
 
-                return (
-                  <div key={plan.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded">{plan.date}</span>
-                          <span className="text-xs text-orange-400 font-semibold">{goal?.title || '연관 목표'}</span>
+                  return (
+                    <div key={plan.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4 animate-fadeIn">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded">{plan.date}</span>
+                            <span className="text-xs text-orange-400 font-semibold">{goal?.title || '연관 목표'}</span>
+                          </div>
+                          <h4 className={`text-base font-bold transition ${isCompleted ? 'text-slate-400 line-through' : 'text-white'}`}>{plan.actionText}</h4>
                         </div>
-                        <h4 className={`text-base font-bold transition ${isCompleted ? 'text-slate-400 line-through' : 'text-white'}`}>{plan.actionText}</h4>
+                        <button onClick={() => setPlanToDelete(plan.id)} className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition"><Icon name="Trash2" size={18} /></button>
                       </div>
-                      <button onClick={() => setPlanToDelete(plan.id)} className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition"><Icon name="Trash2" size={18} /></button>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800/80 text-xs">
-                      <div>
-                        <span className="text-slate-500 block mb-1">목표 계획 시간</span>
-                        <span className="text-slate-200 font-medium">{formatTime(plan.durationPlanned)}</span>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800/80 text-xs">
+                        <div>
+                          <span className="text-slate-500 block mb-1">목표 계획 시간</span>
+                          <span className="text-slate-200 font-medium">{formatTime(plan.durationPlanned)}</span>
+                        </div>
+                        <div>
+                          <label className="text-slate-400 block mb-1">실제 투입 시간(분)</label>
+                          <BlurInput 
+                            type="number" value={plan.durationActual} onChange={(val) => onUpdatePlan({ ...plan, durationActual: parseInt(val, 10) || 0 })} 
+                            placeholder="분 단위 입력" className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-white focus:outline-none focus:border-orange-500 transition" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-400 block mb-1">달성 여부</label>
+                          <button onClick={() => handleToggleStatus(plan)} disabled={isProcessing} className={`w-full py-1.5 rounded font-semibold text-xs border transition disabled:opacity-50 flex justify-center items-center gap-1 ${isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
+                            {isProcessing ? <Icon name="Loader2" size={14} className="animate-spin" /> : (isCompleted ? '✓ 완료' : '미달성 (클릭)')}
+                          </button>
+                        </div>
                       </div>
+
                       <div>
-                        <label className="text-slate-400 block mb-1">실제 투입 시간(분)</label>
-                        <BlurInput 
-                          type="number" 
-                          value={plan.durationActual} 
-                          onChange={(val) => onUpdatePlan({ ...plan, durationActual: parseInt(val, 10) || 0 })} 
-                          placeholder="분 단위 입력" 
-                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-white focus:outline-none focus:border-orange-500 transition" 
+                        <label className="block text-xs font-medium text-slate-400 mb-1">결과물 메모 및 복기</label>
+                        <BlurTextarea 
+                          rows="2" value={plan.notes} onChange={(val) => onUpdatePlan({ ...plan, notes: val })} 
+                          placeholder="오늘의 성과나 피드백을 자유롭게 기록하세요." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500" 
                         />
                       </div>
-                      <div>
-                        <label className="text-slate-400 block mb-1">달성 여부</label>
-                        <button onClick={() => handleToggleStatus(plan)} disabled={isProcessing} className={`w-full py-1.5 rounded font-semibold text-xs border transition disabled:opacity-50 flex justify-center items-center gap-1 ${isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
-                          {isProcessing ? <Icon name="Loader2" size={14} className="animate-spin" /> : (isCompleted ? '✓ 완료' : '미달성 (클릭)')}
-                        </button>
-                      </div>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">결과물 메모 및 복기</label>
-                      <BlurTextarea 
-                        rows="2" 
-                        value={plan.notes} 
-                        onChange={(val) => onUpdatePlan({ ...plan, notes: val })} 
-                        placeholder="오늘의 성과나 피드백을 자유롭게 기록하세요." 
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500" 
-                      />
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+                
+                {/* Pagination Load More Button */}
+                {visibleCount < sortedPlans.length && (
+                  <button 
+                    onClick={() => setVisibleCount(v => v + 5)}
+                    className="w-full py-3 bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-semibold rounded-xl transition border border-slate-800/80 mt-4 flex items-center justify-center gap-2"
+                  >
+                    <Icon name="ChevronDown" size={16} /> 
+                    더보기 ({sortedPlans.length - visibleCount}개 남음)
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1120,11 +1060,8 @@
       const [isSubmitting, setIsSubmitting] = React.useState(false);
 
       React.useEffect(() => {
-        if (habit) {
-          setTitle(habit.title || ''); setTimeStr(habit.time || '09:00'); setRepeatDays(habit.repeatDays || []);
-        } else {
-          setTitle(''); setTimeStr('09:00'); setRepeatDays([1,2,3,4,5]); 
-        }
+        if (habit) { setTitle(habit.title || ''); setTimeStr(habit.time || '09:00'); setRepeatDays(habit.repeatDays || []); }
+        else { setTitle(''); setTimeStr('09:00'); setRepeatDays([1,2,3,4,5]); }
         setIsSubmitting(false);
       }, [habit, isOpen]);
 
@@ -1137,17 +1074,12 @@
 
       const handleSubmit = async (e) => {
         if (e) e.preventDefault(); 
-        if (repeatDays.length === 0) {
-          alert('최소 하루 이상 반복 요일을 선택해주세요.');
-          return;
-        }
+        if (repeatDays.length === 0) return window.customAlert('최소 하루 이상 반복 요일을 선택해주세요.');
         if (isSubmitting) return;
         setIsSubmitting(true);
         try {
           await onSave({ id: habit?.id, title, time: timeStr, repeatDays });
           onClose();
-        } catch(err) {
-          console.error(err);
         } finally {
           setIsSubmitting(false);
         }
@@ -1196,15 +1128,9 @@
       const [isDeleting, setIsDeleting] = React.useState(false);
 
       const weekDates = React.useMemo(() => {
-        const d = new Date();
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-        d.setDate(diff);
-        const dates = [];
-        for (let i = 0; i < 7; i++) {
-          dates.push(new Date(d));
-          d.setDate(d.getDate() + 1);
-        }
+        const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        d.setDate(diff); const dates = [];
+        for (let i = 0; i < 7; i++) { dates.push(new Date(d)); d.setDate(d.getDate() + 1); }
         return dates;
       }, []);
 
@@ -1214,13 +1140,10 @@
       const dailyHabits = habits.filter(h => h.repeatDays && h.repeatDays.includes(selectedDayInt));
 
       const getLast7ExpectedDates = (habit) => {
-        const dates = [];
-        const curr = new Date(selectedDateObj);
-        let iters = 0;
+        const dates = []; const curr = new Date(selectedDateObj); let iters = 0;
         while(dates.length < 7 && iters < 60) { 
           if (habit.repeatDays.includes(curr.getDay())) dates.unshift(getKSTYYYYMMDD(curr));
-          curr.setDate(curr.getDate() - 1);
-          iters++;
+          curr.setDate(curr.getDate() - 1); iters++;
         }
         return dates;
       };
@@ -1228,25 +1151,14 @@
       const confirmDelete = async () => { 
         if (habitToDelete) { 
           setIsDeleting(true);
-          try {
-            await onDeleteHabit(habitToDelete); 
-          } catch(err) {
-             console.error(err);
-          } finally {
-            setHabitToDelete(null); 
-            setIsDeleting(false);
-          }
+          try { await onDeleteHabit(habitToDelete); } finally { setHabitToDelete(null); setIsDeleting(false); }
         } 
       };
 
       const handleToggleLog = async (habitId, dateStr, isCompleted) => {
         if (processingIds.has(habitId)) return;
         setProcessingIds(prev => new Set(prev).add(habitId));
-        try {
-          await onToggleHabitLog(habitId, dateStr, isCompleted);
-        } finally {
-          setProcessingIds(prev => { const next = new Set(prev); next.delete(habitId); return next; });
-        }
+        try { await onToggleHabitLog(habitId, dateStr, isCompleted); } finally { setProcessingIds(prev => { const next = new Set(prev); next.delete(habitId); return next; }); }
       };
 
       return (
@@ -1254,10 +1166,7 @@
           <ConfirmModal isOpen={!!habitToDelete} message="습관을 삭제하시겠습니까? 누적된 달성 기록도 함께 사라집니다." onConfirm={confirmDelete} onClose={() => setHabitToDelete(null)} isProcessing={isDeleting} />
           
           <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-bold text-white">일일 습관</h2>
-              <p className="text-xs text-slate-400">꾸준한 반복으로 강력한 성장을 만드세요.</p>
-            </div>
+            <div><h2 className="text-xl font-bold text-white">일일 습관</h2><p className="text-xs text-slate-400">꾸준한 반복으로 강력한 성장을 만드세요.</p></div>
             <button onClick={() => { setEditingHabit(null); setIsModalOpen(true); }} className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-xl flex items-center gap-1.5 shadow-lg shadow-orange-600/20">
               <Icon name="Plus" size={16} /> 습관 추가
             </button>
@@ -1363,6 +1272,18 @@
       const [habits, setHabits] = React.useState([]);
       const [habitLogs, setHabitLogs] = React.useState([]);
       const [isResetModalOpen, setIsResetModalOpen] = React.useState(false);
+      
+      // Header dropdown state
+      const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+      const dropdownRef = React.useRef(null);
+
+      React.useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, []);
 
       React.useEffect(() => {
         const handleHashChange = () => {
@@ -1385,7 +1306,6 @@
             setIsLoading(false);
           }
         };
-
         initAuth();
 
         let authListener = null;
@@ -1395,33 +1315,22 @@
               setUser(session.user);
               await loadUserData(session.user.id);
             } else if (event === 'SIGNED_OUT' && mounted) {
-              setUser(null);
-              setGoals([]); setPlans([]); setHabits([]); setHabitLogs([]);
+              setUser(null); setGoals([]); setPlans([]); setHabits([]); setHabitLogs([]);
               setIsLoading(false);
             }
           });
           authListener = data;
         }
-
-        return () => {
-          mounted = false;
-          if (authListener) authListener.subscription.unsubscribe();
-        };
+        return () => { mounted = false; if (authListener) authListener.subscription.unsubscribe(); };
       }, []);
 
       const loadUserData = async (userId) => {
         setIsLoading(true);
         try {
           const [userGoals, userPlans, userHabits, userHabitLogs] = await Promise.all([
-            api.data.getGoals(userId),
-            api.data.getPlans(userId),
-            api.data.getHabits(userId),
-            api.data.getHabitLogs(userId)
+            api.data.getGoals(userId), api.data.getPlans(userId), api.data.getHabits(userId), api.data.getHabitLogs(userId)
           ]);
-          if (userGoals !== null) setGoals(userGoals);
-          if (userPlans !== null) setPlans(userPlans);
-          if (userHabits !== null) setHabits(userHabits);
-          if (userHabitLogs !== null) setHabitLogs(userHabitLogs);
+          setGoals(userGoals); setPlans(userPlans); setHabits(userHabits); setHabitLogs(userHabitLogs);
         } catch (e) {
           console.error("데이터 로딩 중 에러:", e);
         } finally {
@@ -1432,62 +1341,37 @@
       const handleSaveGoal = async (goal) => {
         try {
           const saved = await api.data.saveGoal(user.id, goal);
-          setGoals(prev => {
-            const idx = prev.findIndex(g => g.id === saved.id);
-            if (idx >= 0) { const updated = [...prev]; updated[idx] = saved; return updated; }
-            return [...prev, saved];
-          });
-        } catch(e) {
-          console.error(e);
-        }
+          setGoals(prev => prev.findIndex(g => g.id === saved.id) >= 0 ? prev.map(g => g.id === saved.id ? saved : g) : [...prev, saved]);
+        } catch (e) { console.error(e); }
       };
 
       const handleToggleGoalComplete = async (goal) => {
         const updatedGoal = { ...goal, is_completed: !goal.is_completed };
+        setGoals(prev => prev.map(g => g.id === goal.id ? updatedGoal : g)); 
         try {
-          const saved = await api.data.saveGoal(user.id, updatedGoal);
-          setGoals(prev => prev.map(g => g.id === saved.id ? saved : g));
+          await api.data.saveGoal(user.id, updatedGoal);
         } catch(e) {
-          console.error(e);
+          setGoals(prev => prev.map(g => g.id === goal.id ? goal : g)); 
         }
       };
       
       const handleDeleteGoal = async (goalId) => { 
-        try {
-          await api.data.deleteGoal(goalId); 
-          setGoals(prev => prev.filter(g => g.id !== goalId)); 
-        } catch(e) {
-          console.error(e);
-        }
+        try { await api.data.deleteGoal(goalId); setGoals(prev => prev.filter(g => g.id !== goalId)); } catch(e) { console.error(e); }
       };
 
       const handleSavePlan = async (plan) => { 
         try {
-          const saved = await api.data.savePlan(user.id, plan); 
-          setPlans(prev => [saved, ...prev]); 
-          return saved; 
-        } catch(e) { 
-          console.error(e);
-          throw e; 
-        }
+          const saved = await api.data.savePlan(user.id, plan); setPlans(prev => [saved, ...prev]); return saved; 
+        } catch(e) { throw e; }
       };
 
       const handleUpdatePlan = async (plan) => { 
-        try {
-          const saved = await api.data.savePlan(user.id, plan); 
-          setPlans(prev => prev.map(p => p.id === saved.id ? saved : p)); 
-        } catch(e) {
-          console.error(e);
-        }
+        setPlans(prev => prev.map(p => p.id === plan.id ? plan : p));
+        try { await api.data.savePlan(user.id, plan); } catch(e) { console.error(e); }
       };
 
       const handleDeletePlan = async (planId) => { 
-        try {
-          await api.data.deletePlan(planId); 
-          setPlans(prev => prev.filter(p => p.id !== planId)); 
-        } catch(e) {
-          console.error(e);
-        }
+        try { await api.data.deletePlan(planId); setPlans(prev => prev.filter(p => p.id !== planId)); } catch(e) { console.error(e); }
       };
 
       const handleSaveHabit = async (habit) => {
@@ -1495,39 +1379,23 @@
           const saved = await api.data.saveHabit(user.id, habit);
           if (saved) {
             const refreshedHabits = await api.data.getHabits(user.id);
-            if (refreshedHabits !== null) setHabits(refreshedHabits);
+            setHabits(refreshedHabits);
           }
-        } catch(e) {
-          console.error(e);
-        }
+        } catch(e) { console.error(e); }
       };
       
       const handleDeleteHabit = async (habitId) => { 
-        try {
-          await api.data.deleteHabit(habitId); 
-          setHabits(prev => prev.filter(h => h.id !== habitId)); 
-        } catch(e) {
-          console.error(e);
-        }
+        try { await api.data.deleteHabit(habitId); setHabits(prev => prev.filter(h => h.id !== habitId)); } catch(e) { console.error(e); }
       };
       
       const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
         const previousLogs = [...habitLogs];
         
-        // Optimistic Update
-        if (isCompleted) {
-          setHabitLogs(prev => prev.filter(log => !(log.habitId === habitId && log.date === dateStr)));
-        } else {
-          setHabitLogs(prev => [...prev, { id: crypto.randomUUID(), habitId, userId: user.id, date: dateStr }]);
-        }
+        if (isCompleted) setHabitLogs(prev => prev.filter(log => !(log.habitId === habitId && log.date === dateStr)));
+        else setHabitLogs(prev => [...prev, { id: crypto.randomUUID(), habitId, userId: user.id, date: dateStr }]);
 
         const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
-        
-        if (result && result.error) {
-           console.error("Optimistic update failed:", result.error);
-           alert(`체크 상태 저장 실패\n에러 원인: ${result.error.message}\n상세: ${result.error.details || '없음'}`);
-           setHabitLogs(previousLogs);
-        }
+        if (result && result.error) setHabitLogs(previousLogs);
       };
 
       if (isLoading) {
@@ -1547,24 +1415,49 @@
         <div className="min-h-screen flex flex-col bg-black text-slate-100">
           <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
             <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-16">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mr-2 shrink-0">
                 <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center text-white font-black">최</div>
                 <span className="font-bold text-white text-sm hidden sm:inline">최강 목표</span>
               </div>
-              <nav className="flex space-x-1 sm:space-x-2 overflow-x-auto custom-scrollbar">
-                {[
-                  { id: 'goals', label: '목표', icon: 'Target' },
-                  { id: 'execution', label: '계획', icon: 'Edit3' },
-                  { id: 'journal', label: '실행', icon: 'CheckSquare' },
-                  { id: 'habits', label: '습관', icon: 'Activity' },
-                  { id: 'stats', label: '통계', icon: 'BarChart2' }
-                ].map(tab => (
-                  <button key={tab.id} onClick={() => setCurrentTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${currentTab === tab.id ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
-                    <Icon name={tab.icon} size={15} /> <span>{tab.label}</span>
+              
+              <div className="flex items-center flex-1 justify-end gap-1 sm:gap-2">
+                <nav className="flex space-x-1 sm:space-x-2">
+                  {[
+                    { id: 'goals', label: '목표', icon: 'Target' },
+                    { id: 'execution', label: '계획', icon: 'Edit3' },
+                    { id: 'journal', label: '실행', icon: 'CheckSquare' },
+                    { id: 'habits', label: '습관', icon: 'Activity' }
+                  ].map(tab => (
+                    <button key={tab.id} onClick={() => setCurrentTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${currentTab === tab.id ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                      <Icon name={tab.icon} size={15} /> <span className="hidden xs:inline">{tab.label}</span>
+                    </button>
+                  ))}
+                </nav>
+
+                {/* More (Dropdown) Menu */}
+                <div className="relative" ref={dropdownRef}>
+                  <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${['stats', 'finance', 'memo'].includes(currentTab) ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                    <Icon name="MoreVertical" size={15} /> <span className="hidden xs:inline">더보기</span>
                   </button>
-                ))}
-              </nav>
-              <button onClick={() => { api.auth.signOut(); setUser(null); }} className="text-slate-500 hover:text-slate-300 p-2 rounded-lg" title="로그아웃"><Icon name="LogOut" size={18} /></button>
+                  
+                  {isDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden z-50 animate-fadeIn">
+                      <button onClick={() => { setCurrentTab('stats'); setIsDropdownOpen(false); }} className="w-full text-left px-4 py-3 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition">
+                        <Icon name="BarChart2" size={15} /> 통계 리포트
+                      </button>
+                      <div className="w-full text-left px-4 py-3 text-xs text-slate-500 flex items-center gap-2 bg-slate-900/50 cursor-not-allowed">
+                        <Icon name="DollarSign" size={15} /> 가계부 (준비중)
+                      </div>
+                      <div className="w-full text-left px-4 py-3 text-xs text-slate-500 flex items-center gap-2 bg-slate-900/50 cursor-not-allowed">
+                        <Icon name="FileText" size={15} /> 메모 (준비중)
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-px h-6 bg-slate-800 mx-1"></div>
+                <button onClick={() => { api.auth.signOut(); setUser(null); }} className="text-slate-500 hover:text-slate-300 p-2 rounded-lg shrink-0" title="로그아웃"><Icon name="LogOut" size={18} /></button>
+              </div>
             </div>
           </header>
 
