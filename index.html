@@ -232,14 +232,14 @@
       data: {
         getGoals: async (userId) => {
           if (!supabase) return [];
-          const { data, error } = await supabase.from('goals').select('*').eq('user_id', userId);
+          const { data, error } = await supabase.from('goals').select('*').eq('userId', userId);
           if (error) { window.customAlert(`목표 조회 실패: ${error.message} / ${error.details || ''}`); throw error; }
           return data || [];
         },
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
-          const dbPayload = { ...goal, user_id: userId };
-          delete dbPayload.userId;
+          const dbPayload = { ...goal, userId };
+          delete dbPayload.user_id; // Clean up snake_case property just in case
           if (goal.id) {
             const { data, error } = await supabase.from('goals').update(dbPayload).eq('id', goal.id).select();
             if (error) { window.customAlert(`목표 수정 실패: ${error.message}`); throw error; }
@@ -258,14 +258,14 @@
         },
         getPlans: async (userId) => {
           if (!supabase) return [];
-          const { data, error } = await supabase.from('plans').select('*').eq('user_id', userId);
+          const { data, error } = await supabase.from('plans').select('*').eq('userId', userId);
           if (error) { window.customAlert(`계획 조회 실패: ${error.message}`); throw error; }
           return data || [];
         },
         savePlan: async (userId, plan) => {
           if (!supabase) return plan;
-          const { timeMemo, userId: _, ...restPlan } = plan; 
-          const dbPayload = { ...restPlan, user_id: userId };
+          const { timeMemo, user_id, ...restPlan } = plan; 
+          const dbPayload = { ...restPlan, userId };
           let resultData;
           if (plan.id) {
             const { data, error } = await supabase.from('plans').update(dbPayload).eq('id', plan.id).select();
