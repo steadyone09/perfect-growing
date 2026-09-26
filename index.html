@@ -239,7 +239,7 @@
         saveGoal: async (userId, goal) => {
           if (!supabase) return goal;
           const dbPayload = { ...goal, userId };
-          delete dbPayload.user_id; // Clean up snake_case property just in case
+          delete dbPayload.user_id;
           if (goal.id) {
             const { data, error } = await supabase.from('goals').update(dbPayload).eq('id', goal.id).select();
             if (error) { window.customAlert(`목표 수정 실패: ${error.message}`); throw error; }
@@ -338,7 +338,6 @@
             return { error: err };
           }
         },
-        /* 가계부 기능 데이터 통신 (Finance) */
         getBudget: async (userId, yearMonth) => {
           if (!supabase) return 0;
           try {
@@ -400,7 +399,6 @@
             if (error) throw error;
           } catch (error) { window.customAlert(`영수 상태 변경 실패: ${error.message}`); throw error; }
         },
-        /* 메모 기능 데이터 통신 (Memos) */
         getMemos: async (userId) => {
           if (!supabase) return [];
           try {
@@ -1090,14 +1088,12 @@
       const [expenses, setExpenses] = React.useState([]);
       const [isLoading, setIsLoading] = React.useState(true);
 
-      // Form State
       const [expDate, setExpDate] = React.useState(getKSTYYYYMMDD(new Date()));
       const [expType, setExpType] = React.useState('지출');
       const [expDesc, setExpDesc] = React.useState('');
       const [expAmount, setExpAmount] = React.useState('');
       const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-      // Calculate date range for current month selection
       const getDateRangeInfo = (dateObj) => {
         const year = dateObj.getFullYear();
         const month = dateObj.getMonth(); 
@@ -1295,8 +1291,8 @@
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">종합 달성률</span><span className="text-3xl font-black text-orange-400">{completionRate}%</span><p className="text-[10px] text-slate-500 mt-2">총 {plans.length}개 계획 중 {completedPlans.length}개 완료</p></div>
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">계획된 목표 시간</span><span className="text-3xl font-black text-white">{formatTime(totalPlannedTime)}</span></div>
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">실제 순수 투입 시간</span><span className="text-3xl font-black text-emerald-400">{formatTime(totalActualTime)}</span></div>
+          </div>
         </div>
-      </div>
       );
     };
 
@@ -1422,9 +1418,7 @@
                   onDragOver={(e) => handleDragOver(e, idx)} 
                   onDrop={(e) => handleDrop(e, idx)} 
                   onDragEnd={handleDragEnd}
-                  className={`bg-slate-900 border border-slate-800 p-5 rounded-2xl transition flex flex-col justify-between cursor-pointer hover:border-slate-700 relative group 
-                    ${draggedOverIndex === idx ? 'border-orange-500 bg-slate-800/50' : ''} 
-                    ${draggedIndex === idx ? 'opacity-50' : ''}`}
+                  className={`bg-slate-900 border border-slate-800 p-5 rounded-2xl transition flex flex-col justify-between cursor-pointer hover:border-slate-700 relative group ${draggedOverIndex === idx ? 'border-orange-500 bg-slate-800/50' : ''} ${draggedIndex === idx ? 'opacity-50' : ''}`}
                   onClick={() => { setSelectedMemo(memo); setIsModalOpen(true); }}
                 >
                   <div className="absolute top-4 right-4 text-slate-600 group-hover:text-slate-400 transition cursor-grab"><Icon name="GripHorizontal" size={16}/></div>
@@ -1433,20 +1427,20 @@
                     <p className="text-xs text-slate-400 line-clamp-3 mb-4">{memo.content}</p>
                   </div>
                   <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
-                <span>{memo.date}</span>
-                <button type="button" onClick={(e) => { e.stopPropagation(); setMemoToDelete(memo.id); }} className="hover:text-red-400 p-1 transition rounded"><Icon name="Trash2" size={14} /></button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
+                    <span>{memo.date}</span>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setMemoToDelete(memo.id); }} className="hover:text-red-400 p-1 transition rounded"><Icon name="Trash2" size={14} /></button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      );
+    };
 
-const App = () => {
-  const [user, setUser] = React.useState(null);
-  const [currentTab, setCurrentTab] = React.useState('goals');
+    const App = () => {
+      const [user, setUser] = React.useState(null);
+      const [currentTab, setCurrentTab] = React.useState('goals');
       const [isLoading, setIsLoading] = React.useState(true);
       
       const [goals, setGoals] = React.useState([]);
