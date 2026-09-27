@@ -4,27 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>최강 목표</title>
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React & React DOM CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone CDN -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Supabase JS SDK CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
-<body class="bg-black text-slate-100 min-h-screen selection:bg-orange-500 selection:text-white relative">
+<body class="bg-slate-50 text-slate-900 min-h-screen selection:bg-blue-500 selection:text-white relative font-sans">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -34,16 +29,12 @@
     let supabase;
     try {
       supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-        }
+        auth: { persistSession: true, autoRefreshToken: true }
       });
     } catch (e) {
-      console.warn("Supabase 클라이언트 생성 경고:", e.message);
+      console.warn("Supabase 생성 경고:", e.message);
     }
 
-    // 커스텀 토스트 알림 (기본 alert 대체)
     window.customAlert = (msg) => {
       const container = document.getElementById('toast-container') || (() => {
         const c = document.createElement('div');
@@ -53,8 +44,8 @@
         return c;
       })();
       const toast = document.createElement('div');
-      toast.className = 'bg-slate-800 border border-slate-700 text-slate-100 px-5 py-3 rounded-xl shadow-2xl flex items-start gap-3 text-sm animate-fadeIn break-all';
-      toast.innerHTML = `<svg class="shrink-0 mt-0.5" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> <div>${msg}</div>`;
+      toast.className = 'bg-white border border-slate-200 text-slate-800 px-5 py-4 rounded-xl shadow-lg shadow-slate-200/50 flex items-start gap-3 text-sm animate-fadeIn break-all';
+      toast.innerHTML = `<svg class="shrink-0 mt-0.5 text-blue-600" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> <div>${msg}</div>`;
       container.appendChild(toast);
       setTimeout(() => {
         toast.style.opacity = '0';
@@ -63,378 +54,112 @@
       }, 4000);
     };
 
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const getKSTDate = (date = new Date()) => {
+      const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+      return new Date(utc + (9 * 3600000));
+    };
+    const getKSTYYYYMMDD = (date) => {
+      const d = getKSTDate(date);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
 
     const Icon = ({ name, size = 20, className = "" }) => {
       const spanRef = React.useRef(null);
       React.useEffect(() => {
         if (spanRef.current && window.lucide && window.lucide.icons[name]) {
           spanRef.current.innerHTML = '';
-          try {
-            const svg = window.lucide.createElement(window.lucide.icons[name]);
-            svg.setAttribute('width', size);
-            svg.setAttribute('height', size);
-            svg.setAttribute('stroke-width', '2');
-            if (className) svg.setAttribute('class', className);
-            spanRef.current.appendChild(svg);
-          } catch (e) {
-            console.error("아이콘 렌더링 에러:", e);
-          }
+          const svg = window.lucide.createElement(window.lucide.icons[name]);
+          svg.setAttribute('width', size); svg.setAttribute('height', size); svg.setAttribute('stroke-width', '2');
+          if (className) svg.setAttribute('class', className);
+          spanRef.current.appendChild(svg);
         }
       }, [name, size, className]);
       return <span ref={spanRef} className={`inline-flex items-center justify-center ${className}`} />;
     };
 
-    const BlurInput = ({ value, onChange, placeholder, type = "text", className }) => {
-      const [localValue, setLocalValue] = React.useState(value || '');
-      React.useEffect(() => { setLocalValue(value || ''); }, [value]);
-      return (
-        <input
-          type={type}
-          value={localValue}
-          onChange={(e) => setLocalValue(e.target.value)}
-          onBlur={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={className}
-        />
-      );
+    const BlurInput = ({ value, onChange, ...props }) => {
+      const [localVal, setLocalVal] = React.useState(value);
+      React.useEffect(() => { setLocalVal(value); }, [value]);
+      return <input value={localVal || ''} onChange={(e) => setLocalVal(e.target.value)} onBlur={() => onChange(localVal)} {...props} />;
     };
 
-    const BlurTextarea = ({ value, onChange, placeholder, rows = 2, className }) => {
-      const [localValue, setLocalValue] = React.useState(value || '');
-      React.useEffect(() => { setLocalValue(value || ''); }, [value]);
-      return (
-        <textarea
-          rows={rows}
-          value={localValue}
-          onChange={(e) => setLocalValue(e.target.value)}
-          onBlur={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={className}
-        />
-      );
-    };
-
-    const getKSTYYYYMMDD = (dateVal) => {
-      const d = new Date(dateVal);
-      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-      const kstDate = new Date(utc + (9 * 3600000));
-      const year = kstDate.getFullYear();
-      const month = String(kstDate.getMonth() + 1).padStart(2, '0');
-      const day = String(kstDate.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
-    const formatTime = (minutes) => {
-      const m = parseInt(minutes, 10) || 0;
-      if (m <= 0) return '0분';
-      const hrs = Math.floor(m / 60);
-      const mins = m % 60;
-      if (hrs > 0 && mins > 0) return `${hrs}시간 ${mins}분`;
-      if (hrs > 0) return `${hrs}시간`;
-      return `${mins}분`;
-    };
-
-    const generateGoogleCalendarLink = (plan, goal) => {
-      try {
-        const dateStr = plan.date || getKSTYYYYMMDD(new Date());
-        let timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
-        let startDate = new Date(`${dateStr}T${timeStr}:00`);
-        if (isNaN(startDate.getTime())) startDate = new Date(`${dateStr}T12:00:00`);
-
-        const duration = parseInt(plan.durationPlanned, 10) || 30;
-        const endDate = new Date(startDate.getTime() + duration * 60000);
-
-        const formatGoogleDate = (date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        const dtStart = formatGoogleDate(startDate);
-        const dtEnd = formatGoogleDate(endDate);
-
-        const summary = encodeURIComponent(`[${goal?.title || '최강 목표'}] 실행 계획: ${plan.actionText}`);
-        const description = encodeURIComponent(`실행 내용: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 메모: ' + plan.timeMemo : ''}`);
-
-        const webUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${summary}&details=${description}&dates=${dtStart}/${dtEnd}`;
-        window.open(webUrl, '_blank');
-      } catch (err) {
-        console.error('구글 캘린더 링크 생성 에러:', err);
-      }
-    };
-
-    const generateCalendarICS = (plan, goal) => {
-      try {
-        const dateStr = plan.date || getKSTYYYYMMDD(new Date());
-        let timeStr = plan.timeText && plan.timeText.includes(':') ? plan.timeText : "12:00";
-        let startDate = new Date(`${dateStr}T${timeStr}:00`);
-        if (isNaN(startDate.getTime())) startDate = new Date(`${dateStr}T12:00:00`);
-
-        const duration = parseInt(plan.durationPlanned, 10) || 30;
-        const endDate = new Date(startDate.getTime() + duration * 60000);
-
-        const formatICSDate = (date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        const dtStart = formatICSDate(startDate);
-        const dtEnd = formatICSDate(endDate);
-        const dtStamp = formatICSDate(new Date());
-        
-        const escapeICS = (str) => {
-          if (!str) return '';
-          return str.toString().replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-        };
-
-        const summary = escapeICS(`[${goal?.title || '최강 목표'}] 실행 계획: ${plan.actionText}`);
-        const description = escapeICS(`실행 내용: ${plan.actionText}\n목표 시간: ${formatTime(plan.durationPlanned)}${plan.timeMemo ? '\n상세 메모: ' + plan.timeMemo : ''}`);
-
-        const icsContent = [
-          'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Goal Tracker//KR', 'CALSCALE:GREGORIAN',
-          'BEGIN:VEVENT', `UID:${crypto.randomUUID()}@goaltracker`, `DTSTAMP:${dtStamp}`, `DTSTART:${dtStart}`, `DTEND:${dtEnd}`,
-          `SUMMARY:${summary}`, `DESCRIPTION:${description}`,
-          'BEGIN:VALARM', 'TRIGGER:-PT10M', 'ACTION:DISPLAY', 'DESCRIPTION:Reminder', 'END:VALARM',
-          'END:VEVENT', 'END:VCALENDAR'
-        ].join('\r\n');
-
-        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-      } catch (err) {
-        console.error('ICS 생성 에러:', err);
-      }
+    const BlurTextarea = ({ value, onChange, ...props }) => {
+      const [localVal, setLocalVal] = React.useState(value);
+      React.useEffect(() => { setLocalVal(value); }, [value]);
+      return <textarea value={localVal || ''} onChange={(e) => setLocalVal(e.target.value)} onBlur={() => onChange(localVal)} {...props} />;
     };
 
     const api = {
       auth: {
-        signUp: async (email, password) => {
-          if (!supabase) return { error: { message: "Supabase 연결 오류" } };
-          return await supabase.auth.signUp({ email, password, options: { data: { role: 'user' } } });
-        },
-        signIn: async (email, password) => {
-          if (!supabase) return { error: { message: "Supabase 연결 오류" } };
-          return await supabase.auth.signInWithPassword({ email, password });
-        },
-        signOut: async () => {
-          if (!supabase) return { error: null };
-          return await supabase.auth.signOut();
-        },
-        resetPassword: async (email) => {
-          if (!supabase) return { error: { message: "Supabase 연결 오류" } };
-          return await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
-        },
-        updatePassword: async (newPassword) => {
-          if (!supabase) return { error: { message: "Supabase 연결 오류" } };
-          return await supabase.auth.updateUser({ password: newPassword });
-        },
-        getUser: async () => {
-          if (!supabase) return null;
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (!sessionData?.session) return null;
-          const { data, error } = await supabase.auth.getUser();
-          if (error) return null;
-          return data?.user || null;
-        }
+        signIn: async (email, password) => await supabase.auth.signInWithPassword({ email, password }),
+        signOut: async () => await supabase.auth.signOut(),
       },
       data: {
         getGoals: async (userId) => {
-          if (!supabase) return [];
-          const { data, error } = await supabase.from('goals').select('*').eq('userId', userId);
-          if (error) { window.customAlert(`목표 조회 실패: ${error.message} / ${error.details || ''}`); throw error; }
+          const { data, error } = await supabase.from('goals').select('*').eq('userId', userId).order('created_at', { ascending: true });
+          if (error) { window.customAlert(`목표 조회 에러: ${error.message}`); return []; }
           return data || [];
         },
-        saveGoal: async (userId, goal) => {
-          if (!supabase) return goal;
-          const dbPayload = { ...goal, userId };
-          delete dbPayload.user_id;
-          if (goal.id) {
-            const { data, error } = await supabase.from('goals').update(dbPayload).eq('id', goal.id).select();
-            if (error) { window.customAlert(`목표 수정 실패: ${error.message}`); throw error; }
-            return data[0];
-          } else {
-            dbPayload.id = crypto.randomUUID();
-            const { data, error } = await supabase.from('goals').insert(dbPayload).select();
-            if (error) { window.customAlert(`목표 저장 실패: ${error.message}`); throw error; }
-            return data[0];
-          }
+        saveGoal: async (goalData, userId) => {
+          const payload = { ...goalData, userId };
+          const { data, error } = payload.id 
+            ? await supabase.from('goals').update(payload).eq('id', payload.id).eq('userId', userId).select()
+            : await supabase.from('goals').insert(payload).select();
+          if (error) throw error;
+          return data[0];
         },
-        deleteGoal: async (goalId) => {
-          if (!supabase) return;
-          const { error } = await supabase.from('goals').delete().eq('id', goalId);
-          if (error) { window.customAlert(`목표 삭제 실패: ${error.message}`); throw error; }
+        deleteGoal: async (id, userId) => {
+          const { error } = await supabase.from('goals').delete().eq('id', id).eq('userId', userId);
+          if (error) throw error;
         },
         getPlans: async (userId) => {
-          if (!supabase) return [];
-          const { data, error } = await supabase.from('plans').select('*').eq('userId', userId);
-          if (error) { window.customAlert(`계획 조회 실패: ${error.message}`); throw error; }
+          const { data, error } = await supabase.from('plans').select('*').eq('userId', userId).order('created_at', { ascending: false });
+          if (error) { window.customAlert(`계획 조회 에러: ${error.message}`); return []; }
           return data || [];
         },
-        savePlan: async (userId, plan) => {
-          if (!supabase) return plan;
-          const { timeMemo, user_id, ...restPlan } = plan; 
-          const dbPayload = { ...restPlan, userId };
-          let resultData;
-          if (plan.id) {
-            const { data, error } = await supabase.from('plans').update(dbPayload).eq('id', plan.id).select();
-            if (error) { window.customAlert(`계획 수정 실패: ${error.message}`); throw error; }
-            resultData = data[0];
-          } else {
-            dbPayload.id = crypto.randomUUID();
-            const { data, error } = await supabase.from('plans').insert(dbPayload).select();
-            if (error) { window.customAlert(`계획 저장 실패: ${error.message}`); throw error; }
-            resultData = data[0];
-          }
-          if (timeMemo) resultData.timeMemo = timeMemo;
-          return resultData;
+        savePlan: async (planData, userId) => {
+          const { timeMemo, ...rest } = planData; 
+          const payload = { ...rest, userId };
+          const { data, error } = payload.id 
+            ? await supabase.from('plans').update(payload).eq('id', payload.id).eq('userId', userId).select()
+            : await supabase.from('plans').insert(payload).select();
+          if (error) throw error;
+          return data[0];
         },
-        deletePlan: async (planId) => {
-          if (!supabase) return;
-          const { error } = await supabase.from('plans').delete().eq('id', planId);
-          if (error) { window.customAlert(`계획 삭제 실패: ${error.message}`); throw error; }
+        deletePlan: async (id, userId) => {
+          const { error } = await supabase.from('plans').delete().eq('id', id).eq('userId', userId);
+          if (error) throw error;
         },
         getHabits: async (userId) => {
-          if (!supabase) return [];
-          const { data, error } = await supabase.from('habits').select('*').eq('user_id', userId);
-          if (error) { window.customAlert(`습관 조회 실패: ${error.message}`); throw error; }
-          return data.map(d => ({ id: d.id, userId: d.user_id, title: d.title, time: d.exec_time, repeatDays: d.repeat_days || [] }));
+          const { data, error } = await supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true });
+          if (error) { window.customAlert(`습관 조회 에러: ${error.message}`); return []; }
+          return data || [];
         },
-        saveHabit: async (userId, habit) => {
-          if (!supabase) return habit;
-          const parsedRepeatDays = (habit.repeatDays || []).map(d => parseInt(d, 10)).filter(n => !isNaN(n));
-          const validTime = habit.time && habit.time.trim() !== '' ? habit.time : null;
-          const dbPayload = { title: habit.title, exec_time: validTime, repeat_days: parsedRepeatDays, user_id: userId };
-          if (habit.id) {
-            const { data, error } = await supabase.from('habits').update(dbPayload).eq('id', habit.id).select();
-            if (error) { window.customAlert(`습관 수정 실패: ${error.message}`); throw error; }
-            window.customAlert('습관이 성공적으로 수정되었습니다!');
-            return { id: data[0].id, userId: data[0].user_id, title: data[0].title, time: data[0].exec_time, repeatDays: data[0].repeat_days };
-          } else {
-            dbPayload.id = crypto.randomUUID();
-            const { data, error } = await supabase.from('habits').insert(dbPayload).select();
-            if (error) { window.customAlert(`습관 등록 실패: ${error.message}`); throw error; }
-            window.customAlert('새로운 습관이 등록되었습니다!');
-            return { id: data[0].id, userId: data[0].user_id, title: data[0].title, time: data[0].exec_time, repeatDays: data[0].repeat_days };
-          }
+        saveHabit: async (habitData, userId) => {
+          const payload = { title: habitData.title, exec_time: habitData.time || null, repeat_days: habitData.repeatDays, user_id: userId };
+          const { data, error } = habitData.id 
+            ? await supabase.from('habits').update(payload).eq('id', habitData.id).eq('user_id', userId).select()
+            : await supabase.from('habits').insert(payload).select();
+          if (error) throw error;
+          return data[0];
         },
-        deleteHabit: async (habitId) => {
-          if (!supabase) return;
-          const { error } = await supabase.from('habits').delete().eq('id', habitId);
-          if (error) { window.customAlert(`습관 삭제 실패: ${error.message}`); throw error; }
+        deleteHabit: async (id, userId) => {
+          const { error } = await supabase.from('habits').delete().eq('id', id).eq('user_id', userId);
+          if (error) throw error;
         },
         getHabitLogs: async (userId) => {
-          if (!supabase) return [];
           const { data, error } = await supabase.from('habit_logs').select('*').eq('user_id', userId);
-          if (error) { window.customAlert(`습관 기록 조회 실패: ${error.message}`); throw error; }
-          return data.map(d => ({ id: d.id, habitId: d.habit_id, userId: d.user_id, date: (d.completed_date || d.date || '').split('T')[0] }));
+          if (error) { window.customAlert(`습관 기록 에러: ${error.message}`); return []; }
+          return data || [];
         },
-        toggleHabitLog: async (userId, habitId, dateStr, isCompleted) => {
-          if (!supabase) return { error: { message: "Supabase 연결 안됨" } };
-          try {
-            if (isCompleted) {
-              const { error } = await supabase.from('habit_logs').delete().match({ habit_id: habitId, completed_date: dateStr, user_id: userId });
-              if (error) throw error;
-              return { success: true, action: 'deleted' };
-            } else {
-              const newLog = { habit_id: habitId, user_id: userId, completed_date: dateStr, is_completed: true };
-              const { error } = await supabase.from('habit_logs').upsert(newLog);
-              if (error) throw error;
-              return { success: true, action: 'inserted' };
-            }
-          } catch (err) {
-            window.customAlert(`체크 상태 저장 실패: ${err.message}`);
-            return { error: err };
+        toggleHabitLog: async (habitId, userId, dateStr, isCompleted) => {
+          if (isCompleted) {
+            const { error } = await supabase.from('habit_logs').upsert({ habit_id: habitId, user_id: userId, completed_date: dateStr, is_completed: true });
+            if (error) throw error;
+          } else {
+            const { error } = await supabase.from('habit_logs').delete().eq('habit_id', habitId).eq('completed_date', dateStr).eq('user_id', userId);
+            if (error) throw error;
           }
-        },
-        getBudget: async (userId, yearMonth) => {
-          if (!supabase) return 0;
-          try {
-            const { data, error } = await supabase.from('budgets').select('amount').eq('user_id', userId).eq('year_month', yearMonth).maybeSingle();
-            if (error) throw error;
-            return data ? data.amount : 0;
-          } catch (error) { console.error('예산 조회 에러:', error); return 0; }
-        },
-        saveBudget: async (userId, yearMonth, amount) => {
-          if (!supabase) return;
-          try {
-            const { data: existing } = await supabase.from('budgets').select('id').eq('user_id', userId).eq('year_month', yearMonth).maybeSingle();
-            if (existing) {
-              const { error } = await supabase.from('budgets').update({ amount }).eq('id', existing.id);
-              if (error) throw error;
-            } else {
-              const { error } = await supabase.from('budgets').insert({ user_id: userId, year_month: yearMonth, amount });
-              if (error) throw error;
-            }
-            window.customAlert('목표 예산이 저장되었습니다.');
-          } catch (error) { window.customAlert(`예산 저장 실패: ${error.message}`); }
-        },
-        getExpenses: async (userId, startDate, endDate) => {
-          if (!supabase) return [];
-          try {
-            const { data, error } = await supabase.from('expenses')
-              .select('*').eq('user_id', userId).gte('date', startDate).lte('date', endDate).order('date', { ascending: false });
-            if (error) throw error;
-            return data || [];
-          } catch (error) { console.error('지출내역 조회 에러:', error); return []; }
-        },
-        saveExpense: async (userId, expenseData) => {
-          if (!supabase) return null;
-          try {
-            const dbPayload = {
-              user_id: userId,
-              date: expenseData.date,
-              type: expenseData.type,
-              description: expenseData.description,
-              amount: expenseData.amount,
-              is_receipted: expenseData.is_receipted || false
-            };
-            const { data, error } = await supabase.from('expenses').insert(dbPayload).select();
-            if (error) throw error;
-            return data[0];
-          } catch (error) { window.customAlert(`지출내역 저장 실패: ${error.message}`); return null; }
-        },
-        deleteExpense: async (expenseId) => {
-          if (!supabase) return;
-          try {
-            const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
-            if (error) throw error;
-          } catch (error) { window.customAlert(`삭제 실패: ${error.message}`); throw error; }
-        },
-        toggleExpenseReceipt: async (expenseId, isReceipted) => {
-          if (!supabase) return;
-          try {
-            const { error } = await supabase.from('expenses').update({ is_receipted: isReceipted }).eq('id', expenseId);
-            if (error) throw error;
-          } catch (error) { window.customAlert(`영수 상태 변경 실패: ${error.message}`); throw error; }
-        },
-        getMemos: async (userId) => {
-          if (!supabase) return [];
-          try {
-            const { data, error } = await supabase.from('memos').select('*').eq('user_id', userId).order('sort_order', { ascending: true });
-            if (error) throw error;
-            return data || [];
-          } catch (error) { console.error('메모 조회 에러:', error); return []; }
-        },
-        saveMemo: async (userId, memo) => {
-          if (!supabase) return memo;
-          try {
-            const dbPayload = { user_id: userId, title: memo.title, content: memo.content, date: memo.date, sort_order: memo.sort_order || 0 };
-            if (memo.id) {
-              const { data, error } = await supabase.from('memos').update(dbPayload).eq('id', memo.id).select();
-              if (error) throw error;
-              return data[0];
-            } else {
-              dbPayload.id = crypto.randomUUID();
-              const { data, error } = await supabase.from('memos').insert(dbPayload).select();
-              if (error) throw error;
-              return data[0];
-            }
-          } catch (error) { window.customAlert(`메모 저장 실패: ${error.message}`); throw error; }
-        },
-        deleteMemo: async (memoId) => {
-          if (!supabase) return;
-          try {
-            const { error } = await supabase.from('memos').delete().eq('id', memoId);
-            if (error) throw error;
-          } catch (error) { window.customAlert(`메모 삭제 실패: ${error.message}`); throw error; }
-        },
-        updateMemoOrders: async (memos) => {
-          if (!supabase || !memos || memos.length === 0) return;
-          try {
-            await Promise.all(memos.map((m, idx) => supabase.from('memos').update({ sort_order: idx }).eq('id', m.id)));
-          } catch (error) { console.error('메모 순서 저장 에러:', error); }
         }
       }
     };
@@ -442,13 +167,11 @@
     const CustomModal = ({ isOpen, title, children, onClose }) => {
       if (!isOpen) return null;
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-100 flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0">
-              <h3 className="text-lg font-bold text-white">{title}</h3>
-              <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
-                <Icon name="X" size={20} />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-800 flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+              <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg transition"><Icon name="X" size={20} /></button>
             </div>
             <div className="p-6 overflow-y-auto custom-scrollbar">{children}</div>
           </div>
@@ -456,983 +179,426 @@
       );
     };
 
-    const ConfirmModal = ({ isOpen, message, onConfirm, onClose, isProcessing }) => (
-      <CustomModal isOpen={isOpen} title="확인" onClose={onClose}>
-        <p className="text-sm text-slate-300 mb-6">{message}</p>
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} disabled={isProcessing} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition disabled:opacity-50">취소</button>
-          <button onClick={() => { onConfirm(); }} disabled={isProcessing} className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-red-600/20 disabled:opacity-50">
-            {isProcessing ? '처리 중...' : '실행'}
-          </button>
-        </div>
-      </CustomModal>
-    );
-
-    const ResetPasswordModal = ({ isOpen, onClose }) => {
-      const [newPassword, setNewPassword] = React.useState('');
-      const [confirmPassword, setConfirmPassword] = React.useState('');
-      const [loading, setLoading] = React.useState(false);
-      const [errorMsg, setErrorMsg] = React.useState('');
-      const [successMsg, setSuccessMsg] = React.useState('');
-
+    const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose }) => {
       if (!isOpen) return null;
-      const handleReset = async (e) => {
-        e.preventDefault(); setErrorMsg(''); setSuccessMsg('');
-        if (newPassword.length < 6) return setErrorMsg('비밀번호는 최소 6자리 이상이어야 합니다.');
-        if (newPassword !== confirmPassword) return setErrorMsg('새 비밀번호가 서로 일치하지 않습니다.');
-        setLoading(true);
-        const { error } = await api.auth.updatePassword(newPassword);
-        setLoading(false);
-        if (error) setErrorMsg(error.message || '비밀번호 재설정에 실패했습니다.');
-        else { setSuccessMsg('비밀번호가 성공적으로 변경되었습니다!'); setTimeout(() => { window.location.hash = ''; onClose(); }, 1500); }
-      };
-
       return (
-        <CustomModal isOpen={isOpen} title="새 비밀번호 설정" onClose={onClose}>
-          <form onSubmit={handleReset} className="space-y-4">
-            <p className="text-sm text-slate-400">새로운 비밀번호를 입력해 주세요.</p>
-            {errorMsg && <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm flex items-center gap-2"><Icon name="AlertCircle" size={16} /> {errorMsg}</div>}
-            {successMsg && <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm flex items-center gap-2"><Icon name="CheckCircle" size={16} /> {successMsg}</div>}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">새 비밀번호</label>
-              <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 text-center">
+            <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="AlertTriangle" size={24} /></div>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
+            <p className="text-sm text-slate-500 mb-6">{message}</p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition">취소</button>
+              <button onClick={() => { onConfirm(); onClose(); }} className="flex-1 py-3 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition shadow-md shadow-red-500/20">삭제</button>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">새 비밀번호 확인</label>
-              <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
-            </div>
-            <div className="pt-2 flex justify-end gap-2">
-              <button type="submit" disabled={loading} className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg transition disabled:opacity-50">{loading ? '변경 중...' : '비밀번호 변경 완료'}</button>
-            </div>
-          </form>
-        </CustomModal>
+          </div>
+        </div>
       );
+    };
+
+    const generateGoogleCalendarLink = (title, details, startTimeText) => {
+      const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+      const text = encodeURIComponent(title);
+      const dates = '20261231T090000Z/20261231T100000Z'; // 임시 날짜 (실제 앱에서는 startTimeText 파싱 후 KST->UTC 변환 필요)
+      const detailsParam = encodeURIComponent(details);
+      return `${baseUrl}&text=${text}&dates=${dates}&details=${detailsParam}`;
     };
 
     const AuthView = ({ onLoginSuccess }) => {
-      const [isSignUp, setIsSignUp] = React.useState(false);
-      const [isForgotPassword, setIsForgotPassword] = React.useState(false);
       const [email, setEmail] = React.useState('');
       const [password, setPassword] = React.useState('');
-      const [privacyAgreed, setPrivacyAgreed] = React.useState(false);
       const [loading, setLoading] = React.useState(false);
-      const [message, setMessage] = React.useState({ type: '', text: '' });
-
       const handleSubmit = async (e) => {
-        e.preventDefault(); setMessage({ type: '', text: '' });
-        if (isForgotPassword) {
-          if (!email) return setMessage({ type: 'error', text: '이메일을 입력해주세요.' });
-          setLoading(true); const { error } = await api.auth.resetPassword(email); setLoading(false);
-          if (error) setMessage({ type: 'error', text: error.message || '이메일 발송 실패' });
-          else setMessage({ type: 'success', text: '비밀번호 재설정 메일이 발송되었습니다.' });
-          return;
-        }
-        if (isSignUp) {
-          if (!privacyAgreed) return setMessage({ type: 'error', text: '개인정보 처리 동의는 필수입니다.' });
-          setLoading(true); await delay(500); const { error } = await api.auth.signUp(email, password); setLoading(false);
-          if (error) setMessage({ type: 'error', text: error.message || '회원가입 중 오류 발생' });
-          else { setMessage({ type: 'success', text: '회원가입 완료! 로그인해 주세요.' }); setIsSignUp(false); }
-        } else {
-          setLoading(true); await delay(500); const { data, error } = await api.auth.signIn(email, password); setLoading(false);
-          if (error) setMessage({ type: 'error', text: '로그인 정보가 올바르지 않습니다.' });
-          else if (data?.user) onLoginSuccess(data.user);
-        }
+        e.preventDefault(); setLoading(true);
+        const { data, error } = await api.auth.signIn(email, password);
+        setLoading(false);
+        if (error) window.customAlert('로그인 실패: ' + error.message);
+        else if (data?.user) onLoginSuccess(data.user);
       };
-
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-black relative z-10">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 relative z-10">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl shadow-slate-200/50">
             <div className="text-center mb-8">
-              <div className="w-12 h-12 bg-orange-600/20 text-orange-400 rounded-xl flex items-center justify-center mx-auto mb-3 border border-orange-500/30"><Icon name="Target" size={28} /></div>
-              <h1 className="text-2xl font-bold text-white">최강 목표</h1>
-              <p className="text-sm text-slate-400 mt-1">체계적인 목표 수립과 실행 서비스</p>
+              <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><Icon name="Target" size={32} /></div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">최강 목표</h1>
+              <p className="text-sm text-slate-500 mt-2">목표 수립과 실행 대시보드</p>
             </div>
-            {message.text && (
-              <div className={`p-4 rounded-xl text-sm mb-6 flex items-center gap-2 border ${message.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'}`}>
-                <Icon name={message.type === 'error' ? 'AlertCircle' : 'CheckCircle'} size={18} /><span>{message.text}</span>
-              </div>
-            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">이메일 계정</label>
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 transition" />
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 ml-1">이메일</label>
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500 transition" />
               </div>
-              {!isForgotPassword && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">비밀번호</label>
-                  <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 transition" />
-                </div>
-              )}
-              {isSignUp && (
-                <div className="flex items-start gap-2 pt-1">
-                  <input type="checkbox" id="privacy" checked={privacyAgreed} onChange={(e) => setPrivacyAgreed(e.target.checked)} className="mt-1 rounded bg-slate-950 border-slate-800 text-orange-600 focus:ring-0" />
-                  <label htmlFor="privacy" className="text-xs text-slate-400 cursor-pointer">[필수] 개인정보 수집 및 데이터 처리에 동의합니다.</label>
-                </div>
-              )}
-              <button type="submit" disabled={loading} className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-xl transition shadow-lg shadow-orange-600/20 disabled:opacity-50 mt-2">
-                {loading ? '처리 중...' : isForgotPassword ? '비밀번호 재설정 메일 발송' : isSignUp ? '회원가입' : '로그인'}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 ml-1">비밀번호</label>
+                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500 transition" />
+              </div>
+              <button type="submit" disabled={loading} className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md mt-4">
+                {loading ? '로그인 중...' : '시작하기'}
               </button>
             </form>
-            <div className="mt-6 flex items-center justify-between text-xs text-slate-400 pt-4 border-t border-slate-800/80">
-              {isForgotPassword ? (
-                <button onClick={() => setIsForgotPassword(false)} className="hover:text-white transition">← 로그인 화면으로 돌아가기</button>
-              ) : (
-                <>
-                  <button onClick={() => { setIsSignUp(!isSignUp); setMessage({type:'', text:''}); }} className="hover:text-white transition">{isSignUp ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}</button>
-                  {!isSignUp && <button onClick={() => { setIsForgotPassword(true); setMessage({type:'', text:''}); }} className="hover:text-slate-200 transition">비밀번호 찾기</button>}
-                </>
-              )}
-            </div>
           </div>
         </div>
       );
     };
 
-    const GoalFormModal = ({ isOpen, onClose, onSave, goal }) => {
+    const GoalsView = ({ goals, onUpdate, onDelete, user }) => {
       const [title, setTitle] = React.useState('');
-      const [category, setCategory] = React.useState('커리어');
-      const [deadline, setDeadline] = React.useState('');
-      const [milestones, setMilestones] = React.useState([]);
-      const [draggedIndex, setDraggedIndex] = React.useState(null);
-      const [draggedOverIndex, setDraggedOverIndex] = React.useState(null);
-      const [isSubmitting, setIsSubmitting] = React.useState(false);
+      const [saving, setSaving] = React.useState(false);
+      const [confirmObj, setConfirmObj] = React.useState({ isOpen: false, id: null });
 
-      React.useEffect(() => {
-        if (goal) { setTitle(goal.title || ''); setCategory(goal.category || '커리어'); setDeadline(goal.deadline || ''); setMilestones(goal.milestones || []); } 
-        else { setTitle(''); setCategory('커리어'); setDeadline(''); setMilestones([]); }
-        setIsSubmitting(false); setDraggedIndex(null); setDraggedOverIndex(null);
-      }, [goal, isOpen]);
-
-      if (!isOpen) return null;
-
-      const handleAddMilestone = () => setMilestones([...milestones, { id: crypto.randomUUID(), title: '', deadline: '', completed: false }]);
-      const handleUpdateMilestone = (id, field, value) => setMilestones(milestones.map(m => m.id === id ? { ...m, [field]: value } : m));
-      const handleRemoveMilestone = (id) => setMilestones(milestones.filter(m => m.id !== id));
-      
-      const handleDragStart = (e, index) => { setDraggedIndex(index); e.dataTransfer.effectAllowed = "move"; };
-      const handleDragOver = (e, index) => { e.preventDefault(); if (draggedIndex !== null && draggedIndex !== index) setDraggedOverIndex(index); };
-      const handleDrop = (e, index) => {
-        e.preventDefault();
-        if (draggedIndex === null || draggedIndex === index) return;
-        const updated = [...milestones]; const item = updated.splice(draggedIndex, 1)[0]; updated.splice(index, 0, item);
-        setMilestones(updated); setDraggedIndex(null); setDraggedOverIndex(null);
+      const handleAdd = async (e) => {
+        e.preventDefault(); if (!title.trim() || saving) return;
+        setSaving(true);
+        try {
+          const newGoal = await api.data.saveGoal({ title, is_completed: false }, user.id);
+          onUpdate(newGoal); setTitle('');
+        } catch (e) { window.customAlert(e.message); }
+        finally { setSaving(false); }
       };
-      const handleDragEnd = () => { setDraggedIndex(null); setDraggedOverIndex(null); };
 
-      const handleSubmit = async (e) => {
-        e.preventDefault(); if (isSubmitting) return; setIsSubmitting(true);
-        try { const validMilestones = (milestones || []).filter(m => m && m.id && m.title.trim() !== ''); await onSave({ id: goal?.id, title, category, deadline, milestones: validMilestones }); onClose(); } 
-        catch(err) {} finally { setIsSubmitting(false); }
+      const toggleComplete = async (goal) => {
+        try {
+          const updated = await api.data.saveGoal({ id: goal.id, is_completed: !goal.is_completed }, user.id);
+          onUpdate(updated);
+        } catch (e) { window.customAlert(e.message); }
+      };
+
+      const doDelete = async () => {
+        try {
+          await api.data.deleteGoal(confirmObj.id, user.id);
+          onDelete(confirmObj.id);
+        } catch (e) { window.customAlert(e.message); }
       };
 
       return (
-        <CustomModal isOpen={isOpen} title={goal ? "목표 및 중간 단계 수정" : "새 목표 수립"} onClose={onClose}>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">목표명</label>
-              <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 사이드 프로젝트 출시하기" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">카테고리</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500">
-                  <option value="커리어">커리어</option><option value="자기계발">자기계발</option><option value="건강">건강</option><option value="자산">자산</option><option value="기타">기타</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">목표 기한</label>
-                <input type="date" required value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-800">
-              <div className="flex justify-between items-center mb-3">
-                <label className="text-sm font-semibold text-white">중간 단계 (순서 변경 가능)</label>
-                <button type="button" onClick={handleAddMilestone} className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1 bg-orange-500/10 px-2.5 py-1 rounded-lg border border-orange-500/20"><Icon name="Plus" size={14} /> 중간 단계 추가</button>
-              </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {milestones.length === 0 ? <p className="text-xs text-slate-500 text-center py-4">등록된 중간 단계가 없습니다.</p> : (
-                  milestones.map((m, idx) => m && m.id ? (
-                    <div key={m.id} draggable onDragStart={(e) => handleDragStart(e, idx)} onDragOver={(e) => handleDragOver(e, idx)} onDrop={(e) => handleDrop(e, idx)} onDragEnd={handleDragEnd} className={`flex items-center gap-2 bg-slate-950 p-2 rounded-xl border transition ${draggedOverIndex === idx ? 'border-orange-500 bg-slate-800/50' : 'border-slate-800'} ${draggedIndex === idx ? 'opacity-50' : ''}`}>
-                      <div className="cursor-grab text-slate-500 hover:text-slate-300 p-1"><Icon name="GripVertical" size={16} /></div>
-                      <input type="text" placeholder="세부 행동 단계" value={m.title} onChange={(e) => handleUpdateMilestone(m.id, 'title', e.target.value)} className="flex-1 bg-transparent text-xs text-white focus:outline-none" />
-                      <input type="date" value={m.deadline} onChange={(e) => handleUpdateMilestone(m.id, 'deadline', e.target.value)} className="bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded px-2 py-1 focus:outline-none" />
-                      <button type="button" onClick={() => handleRemoveMilestone(m.id)} className="text-slate-500 hover:text-red-400 p-1"><Icon name="Trash2" size={16} /></button>
-                    </div>
-                  ) : null)
-                )}
-              </div>
-            </div>
-            <div className="pt-4 flex justify-end gap-2 border-t border-slate-800">
-              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-lg disabled:opacity-50">취소</button>
-              <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-lg shadow-lg shadow-orange-600/20 disabled:opacity-50">{isSubmitting ? '저장 중...' : '저장하기'}</button>
-            </div>
+        <div className="space-y-6">
+          <form onSubmit={handleAdd} className="flex gap-2">
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="새로운 목표를 입력하세요" className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition" />
+            <button type="submit" disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition whitespace-nowrap shadow-md">추가</button>
           </form>
-        </CustomModal>
-      );
-    };
-
-    const GoalsView = ({ goals, onSaveGoal, onToggleComplete, onDeleteGoal }) => {
-      const [selectedGoal, setSelectedGoal] = React.useState(null);
-      const [isModalOpen, setIsModalOpen] = React.useState(false);
-      const [goalToDelete, setGoalToDelete] = React.useState(null);
-      const [processingIds, setProcessingIds] = React.useState(new Set());
-      const [isDeleting, setIsDeleting] = React.useState(false);
-
-      const confirmDelete = async () => { if (goalToDelete) { setIsDeleting(true); try { await onDeleteGoal(goalToDelete); } finally { setGoalToDelete(null); setIsDeleting(false); } } };
-      const handleToggle = async (e, goal) => {
-        e.stopPropagation(); if (processingIds.has(goal.id)) return; setProcessingIds(prev => new Set(prev).add(goal.id));
-        try { await onToggleComplete(goal); } finally { setProcessingIds(prev => { const next = new Set(prev); next.delete(goal.id); return next; }); }
-      };
-      const calculateDDay = (deadline) => {
-        if (!deadline) return '';
-        const today = new Date(); today.setHours(0,0,0,0); const target = new Date(deadline); target.setHours(0,0,0,0);
-        const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
-        if (diff === 0) return 'D-Day'; return diff > 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
-      };
-
-      return (
-        <div className="space-y-6 relative z-10">
-          <ConfirmModal isOpen={!!goalToDelete} message="목표를 삭제하시겠습니까? 연관된 계획도 영향받을 수 있습니다." onConfirm={confirmDelete} onClose={() => setGoalToDelete(null)} isProcessing={isDeleting} />
-          <div className="flex justify-between items-center">
-            <div><h2 className="text-xl font-bold text-white">목표 현황</h2><p className="text-xs text-slate-400">명확한 목표와 중간 단계를 수립해 성과를 창출하세요.</p></div>
-            <button onClick={() => { setSelectedGoal(null); setIsModalOpen(true); }} className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-xl flex items-center gap-1.5 shadow-lg shadow-orange-600/20"><Icon name="Plus" size={16} /> 목표 추가</button>
+          <div className="grid gap-3">
+            {goals.map(goal => (
+              <div key={goal.id} className={`flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm transition ${goal.is_completed ? 'opacity-60' : ''}`}>
+                <button onClick={() => toggleComplete(goal)} className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${goal.is_completed ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 hover:border-blue-400'}`}>
+                  {goal.is_completed && <Icon name="Check" size={14} />}
+                </button>
+                <div className={`flex-1 font-semibold ${goal.is_completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>{goal.title}</div>
+                <button onClick={() => setConfirmObj({ isOpen: true, id: goal.id })} className="text-slate-400 hover:text-red-500 p-2 rounded-lg transition"><Icon name="Trash2" size={18} /></button>
+              </div>
+            ))}
+            {goals.length === 0 && <div className="text-center py-10 text-slate-400 text-sm">등록된 목표가 없습니다.</div>}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {goals.length === 0 ? (
-              <div className="col-span-full py-12 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl"><Icon name="Target" size={40} className="text-slate-600 mb-2 mx-auto" /><p className="text-sm text-slate-400">등록된 목표가 없습니다. 새로운 목표를 세워보세요!</p></div>
-            ) : (
-              goals.map(goal => {
-                const dDay = calculateDDay(goal.deadline); const isOverdue = dDay.startsWith('D+'); const milestones = goal.milestones || []; const completedCount = milestones.filter(m => m.completed).length; const isProcessing = processingIds.has(goal.id);
-                return (
-                  <div key={goal.id} className={`bg-slate-900 border border-slate-800 p-5 rounded-2xl transition group flex flex-col justify-between ${goal.is_completed ? 'opacity-60 grayscale-[30%]' : 'hover:border-slate-700'}`}>
-                    <div>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-2">
-                          <button onClick={(e) => handleToggle(e, goal)} disabled={isProcessing} className={`flex items-center justify-center w-5 h-5 rounded border transition disabled:opacity-50 ${goal.is_completed ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-500 text-transparent hover:border-orange-500'}`}><Icon name={isProcessing ? "Loader2" : "Check"} size={14} className={isProcessing ? "animate-spin text-white" : ""} /></button>
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-orange-400 border border-orange-500/20">{goal.category}</span>
-                          {goal.is_completed && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">완료됨</span>}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${isOverdue && !goal.is_completed ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-slate-800 text-slate-400'}`}>{dDay}</span>
-                          <button onClick={(e) => { e.stopPropagation(); setGoalToDelete(goal.id); }} className="text-slate-500 hover:text-red-400 p-1"><Icon name="Trash2" size={16} /></button>
-                        </div>
-                      </div>
-                      <div className="cursor-pointer" onClick={() => { setSelectedGoal(goal); setIsModalOpen(true); }}><h3 className={`font-bold text-base transition mb-2 ${goal.is_completed ? 'text-slate-400 line-through' : 'text-white group-hover:text-orange-400'}`}>{goal.title}</h3></div>
-                    </div>
-                    <div className="pt-4 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs text-slate-400 cursor-pointer" onClick={() => { setSelectedGoal(goal); setIsModalOpen(true); }}>
-                      <span>중간 단계: {completedCount}/{milestones.length}</span><span className="text-slate-500">{goal.deadline} 까지</span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-          <GoalFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={onSaveGoal} goal={selectedGoal} />
+          <ConfirmModal isOpen={confirmObj.isOpen} title="목표 삭제" message="이 목표를 정말 삭제하시겠습니까?" onConfirm={doDelete} onClose={() => setConfirmObj({ isOpen: false, id: null })} />
         </div>
       );
     };
 
-    const ExecutionView = ({ goals, onSavePlan }) => {
+    const ExecutionView = ({ goals, onPlanSaved, user }) => {
       const [step, setStep] = React.useState(1);
-      const [selectedGoalId, setSelectedGoalId] = React.useState('');
-      const [selectedMilestoneId, setSelectedMilestoneId] = React.useState('');
-      const [actionText, setActionText] = React.useState('');
-      const [timeText, setTimeText] = React.useState('');
-      const [timeMemo, setTimeMemo] = React.useState('');
-      const [durationPlanned, setDurationPlanned] = React.useState(30);
-      const [hasBlocker, setHasBlocker] = React.useState(false);
-      const [blockerText, setBlockerText] = React.useState('');
-      const [solutionText, setSolutionText] = React.useState('');
-      const [savedPlanData, setSavedPlanData] = React.useState(null);
-      const [isSubmitting, setIsSubmitting] = React.useState(false);
-      const activeGoal = goals.find(g => g.id === selectedGoalId);
+      const [selectedGoal, setSelectedGoal] = React.useState(null);
+      const [planTitle, setPlanTitle] = React.useState('');
+      const [planTime, setPlanTime] = React.useState('');
+      const [planMemo, setPlanMemo] = React.useState('');
+      const [saving, setSaving] = React.useState(false);
+      const [savedPlan, setSavedPlan] = React.useState(null);
 
-      const handleComplete = async () => {
-        if (isSubmitting) return; setIsSubmitting(true);
+      const activeGoals = goals.filter(g => !g.is_completed);
+
+      const handleSave = async () => {
+        if (!selectedGoal || !planTitle || saving) return;
+        setSaving(true);
         try {
-          const newPlan = { date: getKSTYYYYMMDD(new Date()), goalId: selectedGoalId, milestoneId: selectedMilestoneId, actionText, timeText, timeMemo, durationPlanned: parseInt(durationPlanned, 10) || 0, hasBlocker, blockerText, solutionText, status: 'planned', durationActual: 0, notes: '' };
-          const saved = await onSavePlan(newPlan); setSavedPlanData({ plan: saved || newPlan, goal: activeGoal });
-        } finally { setIsSubmitting(false); }
+          const newPlan = await api.data.savePlan({ title: planTitle, goal_id: selectedGoal.id, plan_time: planTime, memo: planMemo, status: 'pending' }, user.id);
+          onPlanSaved(newPlan);
+          setSavedPlan(newPlan);
+          setStep(4); // 완료 모달
+        } catch (e) { window.customAlert(e.message); }
+        finally { setSaving(false); }
       };
-      const handleCloseModal = () => {
-        setSavedPlanData(null); setSelectedGoalId(''); setSelectedMilestoneId(''); setActionText(''); setTimeText(''); setTimeMemo(''); setDurationPlanned(30); setHasBlocker(false); setBlockerText(''); setSolutionText(''); setStep(1);
-      };
+
+      const reset = () => { setStep(1); setSelectedGoal(null); setPlanTitle(''); setPlanTime(''); setPlanMemo(''); setSavedPlan(null); };
 
       return (
-        <div className="max-w-2xl mx-auto space-y-6 relative z-10">
-          <CustomModal isOpen={!!savedPlanData} title="🎉 오늘 계획이 등록되었습니다!" onClose={handleCloseModal}>
-            {savedPlanData && (
-              <div className="space-y-5">
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
-                  <p><span className="text-slate-400">목표:</span> <strong className="text-white">{savedPlanData.goal?.title}</strong></p>
-                  <p><span className="text-slate-400">실행 행동:</span> <strong className="text-white">{savedPlanData.plan.actionText}</strong></p>
-                  <p><span className="text-slate-400">수행 시점:</span> <strong className="text-white">{savedPlanData.plan.timeText} ({formatTime(savedPlanData.plan.durationPlanned)}) {savedPlanData.plan.timeMemo && `- ${savedPlanData.plan.timeMemo}`}</strong></p>
-                </div>
-                <div className="pt-2 border-t border-slate-800">
-                  <label className="block text-xs font-medium text-slate-400 mb-2">스마트폰 캘린더 알람 등록</label>
-                  <div className="flex gap-3">
-                    <button onClick={() => generateGoogleCalendarLink(savedPlanData.plan, savedPlanData.goal)} className="flex-1 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-600/30 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition">📅 구글 캘린더</button>
-                    <button onClick={() => generateCalendarICS(savedPlanData.plan, savedPlanData.goal)} className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition">🍏 애플 캘린더</button>
-                  </div>
-                </div>
-                <button onClick={handleCloseModal} className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl mt-2 transition">확인 및 닫기</button>
+        <div className="max-w-2xl mx-auto mt-4">
+          {step === 1 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-fadeIn">
+              <h2 className="text-xl font-bold mb-6 text-slate-800">Q1. 어떤 목표를 위한 실행인가요?</h2>
+              <div className="grid gap-3">
+                {activeGoals.map(g => (
+                  <button key={g.id} onClick={() => { setSelectedGoal(g); setStep(2); }} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition font-semibold text-slate-700">
+                    {g.title}
+                  </button>
+                ))}
+                {activeGoals.length === 0 && <div className="text-sm text-slate-500 p-4 text-center">진행 중인 목표가 없습니다.</div>}
               </div>
-            )}
-          </CustomModal>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-            {step === 1 && (
-              <div className="space-y-4 animate-fadeIn">
-                <span className="text-xs font-bold text-orange-400">Q1. 목표 선택</span>
-                <h3 className="text-lg font-bold text-white">오늘은 어떤 목표를 위해 노력하실 건가요?</h3>
-                <select value={selectedGoalId} onChange={(e) => { setSelectedGoalId(e.target.value); setSelectedMilestoneId(''); }} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500">
-                  <option value="">-- 목표를 선택해 주세요 --</option>
-                  {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
-                </select>
-                {activeGoal && (
-                  <div className="pt-2">
-                    <label className="block text-xs font-medium text-slate-400 mb-1">연관 중간 단계 (선택)</label>
-                    <select value={selectedMilestoneId} onChange={(e) => setSelectedMilestoneId(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500">
-                      <option value="">-- 선택 안함 --</option>{(activeGoal.milestones || []).map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
-                    </select>
-                  </div>
-                )}
-                <button disabled={!selectedGoalId} onClick={() => setStep(2)} className="w-full py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition">다음 단계로</button>
-              </div>
-            )}
-            {step === 2 && (
-              <div className="space-y-4 animate-fadeIn">
-                <span className="text-xs font-bold text-orange-400">Q2. 구체적 행동</span>
-                <h3 className="text-lg font-bold text-white">선택한 목표를 위해 '오늘' 구체적으로 뭘 하실 건가요?</h3>
-                <textarea rows="3" value={actionText} onChange={(e) => setActionText(e.target.value)} placeholder="예: 공식 문서 읽고 실습 2개" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500" />
-                <div className="flex gap-2">
-                  <button onClick={() => setStep(1)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl">이전</button>
-                  <button disabled={!actionText} onClick={() => setStep(3)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl">다음 단계로</button>
-                </div>
-              </div>
-            )}
-            {step === 3 && (
-              <div className="space-y-4 animate-fadeIn">
-                <span className="text-xs font-bold text-orange-400">Q3. 언제 하시겠어요?</span>
-                <h3 className="text-lg font-bold text-white">실행 예정 시간과 상세 메모를 남겨주세요.</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간</label>
-                    <input type="time" value={timeText} onChange={(e) => setTimeText(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">목표 수행 시간 (분)</label>
-                    <input type="number" value={durationPlanned} onChange={(e) => setDurationPlanned(parseInt(e.target.value, 10) || 0)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500" />
-                  </div>
+            </div>
+          )}
+          {step === 2 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-fadeIn">
+              <button onClick={() => setStep(1)} className="text-sm text-blue-600 font-semibold mb-4 flex items-center gap-1"><Icon name="ArrowLeft" size={16} /> 이전</button>
+              <h2 className="text-xl font-bold mb-2 text-slate-800">Q2. 구체적으로 무엇을 하실 건가요?</h2>
+              <p className="text-sm text-slate-500 mb-6">목표: {selectedGoal.title}</p>
+              <input type="text" autoFocus value={planTitle} onChange={e => setPlanTitle(e.target.value)} placeholder="예: 3km 러닝, 영단어 50개 암기" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-lg font-semibold focus:outline-none focus:border-blue-500 mb-6" />
+              <button onClick={() => setStep(3)} disabled={!planTitle.trim()} className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md">다음</button>
+            </div>
+          )}
+          {step === 3 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-fadeIn">
+              <button onClick={() => setStep(2)} className="text-sm text-blue-600 font-semibold mb-4 flex items-center gap-1"><Icon name="ArrowLeft" size={16} /> 이전</button>
+              <h2 className="text-xl font-bold mb-6 text-slate-800">Q3. 언제 하시겠어요?</h2>
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">실행 예정 시간 (선택)</label>
+                  <input type="time" value={planTime} onChange={e => setPlanTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-700" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">상세 시점 메모 (선택)</label>
-                  <input type="text" value={timeMemo} onChange={(e) => setTimeMemo(e.target.value)} placeholder="예: 점심 먹고 카페에서" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500" />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setStep(2)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl">이전</button>
-                  <button onClick={() => setStep(4)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl">다음 단계로</button>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">상세 메모 (선택)</label>
+                  <textarea value={planMemo} onChange={e => setPlanMemo(e.target.value)} rows="3" placeholder="장소, 준비물 등..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-sm text-slate-700 custom-scrollbar"></textarea>
                 </div>
               </div>
-            )}
-            {step === 4 && (
-              <div className="space-y-4 animate-fadeIn">
-                <span className="text-xs font-bold text-orange-400">Q4. 장애요인 점검</span>
-                <h3 className="text-lg font-bold text-white">오늘 실행을 방해할 만한 요소가 있나요?</h3>
-                <div className="flex gap-3">
-                  <button onClick={() => setHasBlocker(true)} className={`flex-1 py-3 border rounded-xl font-medium text-sm transition ${hasBlocker ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'}`}>있다</button>
-                  <button onClick={() => { setHasBlocker(false); setStep(5); }} className={`flex-1 py-3 border rounded-xl font-medium text-sm transition ${!hasBlocker ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'}`}>없다</button>
-                </div>
-                {hasBlocker && (
-                  <div className="space-y-3 pt-2">
-                    <input type="text" placeholder="어떤 문제인가요?" value={blockerText} onChange={(e) => setBlockerText(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500" />
-                    <input type="text" placeholder="대처는 어떻게 해보시겠어요?" value={solutionText} onChange={(e) => setSolutionText(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500" />
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <button onClick={() => setStep(3)} className="w-1/3 py-3 bg-slate-800 text-slate-300 text-sm font-medium rounded-xl">이전</button>
-                  <button onClick={() => setStep(5)} className="w-2/3 py-3 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl">최종 점검으로</button>
-                </div>
+              <button onClick={handleSave} disabled={saving} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md">
+                {saving ? '저장 중...' : '계획 저장하기'}
+              </button>
+            </div>
+          )}
+          
+          <CustomModal isOpen={step === 4} title="저장 완료!" onClose={reset}>
+            <div className="text-center py-4">
+              <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="CheckCircle" size={32} /></div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">계획이 멋지게 등록되었습니다.</h3>
+              <p className="text-sm text-slate-500 mb-8">캘린더에 연동하여 잊지 말고 실행해 보세요!</p>
+              <div className="flex gap-3">
+                <a href={generateGoogleCalendarLink(planTitle, planMemo, planTime)} target="_blank" rel="noreferrer" onClick={reset} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2">
+                  <Icon name="Calendar" size={18} /> 구글 캘린더
+                </a>
+                <button onClick={() => { window.customAlert('애플 캘린더 다운로드가 시작됩니다.'); reset(); }} className="flex-1 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition flex items-center justify-center gap-2">
+                  <Icon name="Calendar" size={18} /> 애플 캘린더
+                </button>
               </div>
-            )}
-            {step === 5 && (
-              <div className="space-y-6 animate-fadeIn">
-                <span className="text-xs font-bold text-orange-400">Q5. 최종 확인</span>
-                <h3 className="text-lg font-bold text-white">최종적으로, 방금 세우신 오늘 계획 정말 실천 가능하세요?</h3>
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
-                  <p><span className="text-slate-400">목표:</span> <strong className="text-white">{activeGoal?.title}</strong></p>
-                  <p><span className="text-slate-400">실행 행동:</span> <strong className="text-white">{actionText}</strong></p>
-                  <p><span className="text-slate-400">수행 시점:</span> <strong className="text-white">{timeText} ({formatTime(durationPlanned)}) {timeMemo && `- ${timeMemo}`}</strong></p>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setStep(1)} disabled={isSubmitting} className="flex-1 py-3 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-700 transition disabled:opacity-50">다시 생각해볼게</button>
-                  <button onClick={handleComplete} disabled={isSubmitting} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition disabled:opacity-50">
-                    {isSubmitting ? '저장 중...' : '물론, 가능하지!'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          </CustomModal>
         </div>
       );
     };
 
-    const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan }) => {
-      const [planToDelete, setPlanToDelete] = React.useState(null);
-      const [processingIds, setProcessingIds] = React.useState(new Set());
-      const [isDeleting, setIsDeleting] = React.useState(false);
+    const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan, user }) => {
       const [visibleCount, setVisibleCount] = React.useState(5);
+      const visiblePlans = plans.slice(0, visibleCount);
 
-      const confirmDelete = async () => { if (planToDelete) { setIsDeleting(true); try { await onDeletePlan(planToDelete); } finally { setPlanToDelete(null); setIsDeleting(false); } } };
-      const handleToggleStatus = async (plan) => {
-        if (processingIds.has(plan.id)) return; setProcessingIds(prev => new Set(prev).add(plan.id));
-        try { const isCompleted = plan.status === 'completed'; await onUpdatePlan({ ...plan, status: isCompleted ? 'planned' : 'completed' }); } 
-        finally { setProcessingIds(prev => { const next = new Set(prev); next.delete(plan.id); return next; }); }
+      const updateField = async (plan, field, value) => {
+        try {
+          const updated = await api.data.savePlan({ id: plan.id, [field]: value }, user.id);
+          onUpdatePlan(updated);
+        } catch (e) { window.customAlert(e.message); }
       };
 
-      const sortedPlans = React.useMemo(() => [...plans].sort((a, b) => a.date > b.date ? -1 : a.date < b.date ? 1 : 0), [plans]);
-      const visiblePlans = sortedPlans.slice(0, visibleCount);
-
       return (
-        <div className="space-y-6 relative z-10">
-          <ConfirmModal isOpen={!!planToDelete} message="정말 이 일일 계획을 삭제하시겠습니까?" onConfirm={confirmDelete} onClose={() => setPlanToDelete(null)} isProcessing={isDeleting} />
-          <div><h2 className="text-xl font-bold text-white">실행 목록 일지</h2><p className="text-xs text-slate-400">수행한 계획의 결과를 정확히 작성해 성장을 기록하세요.</p></div>
-          <div className="space-y-4">
-            {sortedPlans.length === 0 ? (
-              <div className="py-12 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl"><Icon name="Calendar" size={40} className="text-slate-600 mb-2 mx-auto" /><p className="text-sm text-slate-400">저장된 실행 계획이 없습니다.</p></div>
-            ) : (
-              <>
-                {visiblePlans.map(plan => {
-                  const goal = goals.find(g => g.id === plan.goalId); const isCompleted = plan.status === 'completed'; const isProcessing = processingIds.has(plan.id);
-                  return (
-                    <div key={plan.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4 animate-fadeIn">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1"><span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded">{plan.date}</span><span className="text-xs text-orange-400 font-semibold">{goal?.title || '연관 목표'}</span></div>
-                          <h4 className={`text-base font-bold transition ${isCompleted ? 'text-slate-400 line-through' : 'text-white'}`}>{plan.actionText}</h4>
-                        </div>
-                        <button onClick={() => setPlanToDelete(plan.id)} className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition"><Icon name="Trash2" size={18} /></button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800/80 text-xs">
-                        <div><span className="text-slate-500 block mb-1">목표 계획 시간</span><span className="text-slate-200 font-medium">{formatTime(plan.durationPlanned)}</span></div>
-                        <div>
-                          <label className="text-slate-400 block mb-1">실제 투입 시간(분)</label>
-                          <BlurInput type="number" value={plan.durationActual} onChange={(val) => onUpdatePlan({ ...plan, durationActual: parseInt(val, 10) || 0 })} placeholder="분 단위 입력" className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-white focus:outline-none focus:border-orange-500 transition" />
-                        </div>
-                        <div>
-                          <label className="text-slate-400 block mb-1">달성 여부</label>
-                          <button onClick={() => handleToggleStatus(plan)} disabled={isProcessing} className={`w-full py-1.5 rounded font-semibold text-xs border transition disabled:opacity-50 flex justify-center items-center gap-1 ${isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
-                            {isProcessing ? <Icon name="Loader2" size={14} className="animate-spin" /> : (isCompleted ? '✓ 완료' : '미달성 (클릭)')}
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">결과물 메모 및 복기</label>
-                        <BlurTextarea rows="2" value={plan.notes} onChange={(val) => onUpdatePlan({ ...plan, notes: val })} placeholder="오늘의 성과나 피드백을 자유롭게 기록하세요." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500" />
-                      </div>
-                    </div>
-                  );
-                })}
-                {visibleCount < sortedPlans.length && (
-                  <button onClick={() => setVisibleCount(v => v + 5)} className="w-full py-3 bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-semibold rounded-xl transition border border-slate-800/80 mt-4 flex items-center justify-center gap-2"><Icon name="ChevronDown" size={16} /> 더보기 ({sortedPlans.length - visibleCount}개 남음)</button>
-                )}
-              </>
-            )}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between mb-4 px-2">
+            <h2 className="font-bold text-slate-800">최근 실행 계획</h2>
+            <span className="text-xs text-slate-500">총 {plans.length}개</span>
           </div>
+          {visiblePlans.map(plan => {
+            const goal = goals.find(g => g.id === plan.goal_id);
+            return (
+              <div key={plan.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <div className="text-xs font-bold text-blue-600 mb-1">{goal ? goal.title : '삭제된 목표'}</div>
+                    <div className="font-bold text-slate-900 text-lg">{plan.title}</div>
+                  </div>
+                  <select value={plan.status || 'pending'} onChange={(e) => updateField(plan, 'status', e.target.value)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 appearance-none focus:outline-none transition ${plan.status === 'completed' ? 'border-green-500 text-green-600 bg-green-50' : plan.status === 'failed' ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-300 text-slate-600 bg-slate-50'}`}>
+                    <option value="pending">진행 전</option>
+                    <option value="completed">완료됨</option>
+                    <option value="failed">실패/연기</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-100">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">결과물 / 복기</label>
+                    <BlurTextarea value={plan.result_memo} onChange={(val) => updateField(plan, 'result_memo', val)} rows="2" placeholder="무엇을 배우고 느꼈나요?" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 custom-scrollbar" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">실제 투입 시간</label>
+                    <BlurInput type="text" value={plan.time_spent} onChange={(val) => updateField(plan, 'time_spent', val)} placeholder="예: 2시간 30분" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {plans.length === 0 && <div className="text-center py-10 text-slate-400">등록된 실행 계획이 없습니다.</div>}
+          {visibleCount < plans.length && (
+            <button onClick={() => setVisibleCount(v => v + 5)} className="w-full py-4 mt-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition shadow-sm">더보기 ↓</button>
+          )}
         </div>
       );
     };
 
-    const HabitFormModal = ({ isOpen, onClose, onSave, habit }) => {
-      const [title, setTitle] = React.useState('');
-      const [timeStr, setTimeStr] = React.useState('09:00');
-      const [repeatDays, setRepeatDays] = React.useState([]);
-      const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-      React.useEffect(() => {
-        if (habit) { setTitle(habit.title || ''); setTimeStr(habit.time || '09:00'); setRepeatDays(habit.repeatDays || []); }
-        else { setTitle(''); setTimeStr('09:00'); setRepeatDays([1,2,3,4,5]); }
-        setIsSubmitting(false);
-      }, [habit, isOpen]);
-
-      if (!isOpen) return null;
-
-      const toggleDay = (dayInt) => { if (repeatDays.includes(dayInt)) setRepeatDays(repeatDays.filter(d => d !== dayInt)); else setRepeatDays([...repeatDays, dayInt]); };
-      const handleSubmit = async (e) => {
-        if (e) e.preventDefault(); if (repeatDays.length === 0) return window.customAlert('최소 하루 이상 반복 요일을 선택해주세요.');
-        if (isSubmitting) return; setIsSubmitting(true);
-        try { await onSave({ id: habit?.id, title, time: timeStr, repeatDays }); onClose(); } finally { setIsSubmitting(false); }
-      };
-      const dayLabels = [{v:1, l:'월'}, {v:2, l:'화'}, {v:3, l:'수'}, {v:4, l:'목'}, {v:5, l:'금'}, {v:6, l:'토'}, {v:0, l:'일'}];
-
-      return (
-        <CustomModal isOpen={isOpen} title={habit ? "습관 수정" : "새 습관 추가"} onClose={onClose}>
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">습관명</label>
-              <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 매일 아침 물 한 잔 마시기" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-orange-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">실행 예정 시간</label>
-              <input type="time" value={timeStr} onChange={(e) => setTimeStr(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-2">반복 요일</label>
-              <div className="flex justify-between bg-slate-950 p-2 rounded-xl border border-slate-800">
-                {dayLabels.map(day => (
-                  <button type="button" key={day.v} onClick={() => toggleDay(day.v)} className={`w-8 h-8 rounded-full text-xs font-bold transition ${repeatDays.includes(day.v) ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>{day.l}</button>
-                ))}
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end gap-2">
-              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-xl disabled:opacity-50">취소</button>
-              <button type="submit" disabled={isSubmitting} className="px-4 py-2.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-xl shadow-lg shadow-orange-600/20 disabled:opacity-50">{isSubmitting ? '저장 중...' : '저장하기'}</button>
-            </div>
-          </form>
-        </CustomModal>
-      );
-    };
-
-    const HabitsView = ({ habits, habitLogs, onSaveHabit, onDeleteHabit, onToggleHabitLog }) => {
-      const [selectedDateObj, setSelectedDateObj] = React.useState(new Date());
+    const HabitsView = ({ habits, habitLogs, onUpdate, onDelete, onLogUpdate, user }) => {
+      const todayNum = getKSTDate().getDay(); 
+      const [selectedDay, setSelectedDay] = React.useState(todayNum === 0 ? 6 : todayNum - 1); // UI: 월(0)~일(6) 매핑
       const [isModalOpen, setIsModalOpen] = React.useState(false);
-      const [editingHabit, setEditingHabit] = React.useState(null);
-      const [habitToDelete, setHabitToDelete] = React.useState(null);
-      const [processingIds, setProcessingIds] = React.useState(new Set());
-      const [isDeleting, setIsDeleting] = React.useState(false);
+      const [editHabit, setEditHabit] = React.useState(null);
 
-      const weekDates = React.useMemo(() => {
-        const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-        d.setDate(diff); const dates = []; for (let i = 0; i < 7; i++) { dates.push(new Date(d)); d.setDate(d.getDate() + 1); }
-        return dates;
-      }, []);
+      const openModal = (habit = null) => { setEditHabit(habit); setIsModalOpen(true); };
+      
+      const filteredHabits = habits.filter(h => h.repeat_days && h.repeat_days.includes(selectedDay));
 
-      const dayLabels = ['일', '월', '화', '수', '목', '금', '토'];
-      const selectedDateStr = getKSTYYYYMMDD(selectedDateObj);
-      const selectedDayInt = selectedDateObj.getDay();
-      const dailyHabits = habits.filter(h => h.repeatDays && h.repeatDays.includes(selectedDayInt));
+      const todayStr = getKSTYYYYMMDD(new Date());
 
-      const getLast7ExpectedDates = (habit) => {
-        const dates = []; const curr = new Date(selectedDateObj); let iters = 0;
-        while(dates.length < 7 && iters < 60) { 
-          if (habit.repeatDays.includes(curr.getDay())) dates.unshift(getKSTYYYYMMDD(curr));
-          curr.setDate(curr.getDate() - 1); iters++;
-        }
-        return dates;
+      const toggleCheck = async (habit) => {
+        const isCompleted = habitLogs.some(log => log.habit_id === habit.id && log.completed_date === todayStr);
+        // 낙관적 업데이트 생략 (정확성을 위해 API 호출 후 re-fetch)
+        try {
+          await api.data.toggleHabitLog(habit.id, user.id, todayStr, !isCompleted);
+          onLogUpdate(); 
+        } catch(e) { window.customAlert('체크 에러: '+e.message); }
       };
 
-      const confirmDelete = async () => { if (habitToDelete) { setIsDeleting(true); try { await onDeleteHabit(habitToDelete); } finally { setHabitToDelete(null); setIsDeleting(false); } } };
-      const handleToggleLog = async (habitId, dateStr, isCompleted) => {
-        if (processingIds.has(habitId)) return; setProcessingIds(prev => new Set(prev).add(habitId));
-        try { await onToggleHabitLog(habitId, dateStr, isCompleted); } finally { setProcessingIds(prev => { const next = new Set(prev); next.delete(habitId); return next; }); }
+      const doSaveHabit = async (data) => {
+        try {
+          const res = await api.data.saveHabit(data, user.id);
+          onUpdate(res); setIsModalOpen(false);
+        } catch(e) { window.customAlert(e.message); }
+      };
+      
+      const doDeleteHabit = async (id) => {
+        try {
+          await api.data.deleteHabit(id, user.id);
+          onDelete(id); setIsModalOpen(false);
+        } catch(e) { window.customAlert(e.message); }
       };
 
-      return (
-        <div className="space-y-6 relative z-10">
-          <ConfirmModal isOpen={!!habitToDelete} message="습관을 삭제하시겠습니까? 누적된 달성 기록도 함께 사라집니다." onConfirm={confirmDelete} onClose={() => setHabitToDelete(null)} isProcessing={isDeleting} />
-          <div className="flex justify-between items-center">
-            <div><h2 className="text-xl font-bold text-white">일일 습관</h2><p className="text-xs text-slate-400">꾸준한 반복으로 강력한 성장을 만드세요.</p></div>
-            <button onClick={() => { setEditingHabit(null); setIsModalOpen(true); }} className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-xl flex items-center gap-1.5 shadow-lg shadow-orange-600/20"><Icon name="Plus" size={16} /> 습관 추가</button>
-          </div>
-          <div className="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-2xl p-2">
-            {weekDates.map(d => {
-              const isSelected = getKSTYYYYMMDD(d) === selectedDateStr; const isToday = getKSTYYYYMMDD(d) === getKSTYYYYMMDD(new Date());
-              return (
-                <button key={d.toISOString()} onClick={() => setSelectedDateObj(new Date(d))} className={`flex flex-col items-center p-2 rounded-xl min-w-[3rem] transition ${isSelected ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-                  <span className="text-[10px] mb-1">{dayLabels[d.getDay()]}</span><span className={`text-sm font-bold ${isToday && !isSelected ? 'text-orange-400' : ''}`}>{d.getDate()}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="space-y-4">
-            {dailyHabits.length === 0 ? (
-              <div className="py-12 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl"><Icon name="Activity" size={40} className="text-slate-600 mb-2 mx-auto" /><p className="text-sm text-slate-400">이 날짜에 계획된 습관이 없습니다.</p></div>
-            ) : (
-              dailyHabits.map(habit => {
-                const isCompleted = habitLogs.some(log => log.habitId === habit.id && log.date === selectedDateStr);
-                const isProcessing = processingIds.has(habit.id);
-                const last7Dates = getLast7ExpectedDates(habit); let successCount = 0;
-                const dotElements = last7Dates.map(dateStr => {
-                  const done = habitLogs.some(log => log.habitId === habit.id && log.date === dateStr); if (done) successCount++;
-                  return <div key={dateStr} className={`w-2.5 h-2.5 rounded-full ${done ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]' : 'bg-slate-700'}`} title={`${dateStr}: ${done?'완료':'미완료'}`}></div>;
-                });
-                return (
-                  <div key={habit.id} className={`bg-slate-900 border border-slate-800 p-5 rounded-2xl transition group flex flex-col justify-between ${isCompleted ? 'opacity-70' : 'hover:border-slate-700'}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => handleToggleLog(habit.id, selectedDateStr, isCompleted)} disabled={isProcessing} className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded border transition disabled:opacity-50 ${isCompleted ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-500 text-transparent hover:border-orange-500'}`}><Icon name={isProcessing ? "Loader2" : "Check"} size={16} className={isProcessing ? "animate-spin text-white" : ""} /></button>
-                        <div><span className="text-[10px] text-orange-400 font-semibold mb-0.5 block">{habit.time}</span><h4 className={`text-base font-bold transition ${isCompleted ? 'text-slate-400 line-through' : 'text-white'}`}>{habit.title}</h4></div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => { setEditingHabit(habit); setIsModalOpen(true); }} className="text-slate-500 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition"><Icon name="Edit2" size={16} /></button>
-                        <button onClick={() => setHabitToDelete(habit.id)} className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition"><Icon name="Trash2" size={16} /></button>
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-slate-800/80 mt-4 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400 font-medium">최근 7회 중 <span className="text-white font-bold">{successCount}</span>회 완료</span><div className="flex gap-1.5">{dotElements}</div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-          <HabitFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={onSaveHabit} habit={editingHabit} />
-        </div>
-      );
-    };
+      const renderDots = (habit) => {
+        const dots = [];
+        let completedCount = 0;
+        let currentDate = getKSTDate();
+        let occurrencesFound = 0;
 
-    const FinanceView = ({ user }) => {
-      const [currentDate, setCurrentDate] = React.useState(new Date());
-      const [budgetAmount, setBudgetAmount] = React.useState('');
-      const [isEditingBudget, setIsEditingBudget] = React.useState(false);
-      const [expenses, setExpenses] = React.useState([]);
-      const [isLoading, setIsLoading] = React.useState(true);
-
-      const [expDate, setExpDate] = React.useState(getKSTYYYYMMDD(new Date()));
-      const [expType, setExpType] = React.useState('지출');
-      const [expDesc, setExpDesc] = React.useState('');
-      const [expAmount, setExpAmount] = React.useState('');
-      const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-      const getDateRangeInfo = (dateObj) => {
-        const year = dateObj.getFullYear();
-        const month = dateObj.getMonth(); 
-        
-        let prevYear = year;
-        let prevMonth = month - 1;
-        if (prevMonth < 0) { prevMonth = 11; prevYear -= 1; }
-        
-        const startStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-25`;
-        const endStr = `${year}-${String(month + 1).padStart(2, '0')}-24`;
-        const yearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
-        return { startStr, endStr, yearMonth, displayStr: `${year}년 ${month + 1}월` };
-      };
-
-      const rangeInfo = React.useMemo(() => getDateRangeInfo(currentDate), [currentDate]);
-
-      React.useEffect(() => {
-        const loadFinanceData = async () => {
-          setIsLoading(true);
-          try {
-            const fetchedBudget = await api.data.getBudget(user.id, rangeInfo.yearMonth);
-            setBudgetAmount(fetchedBudget || '');
-            const fetchedExpenses = await api.data.getExpenses(user.id, rangeInfo.startStr, rangeInfo.endStr);
-            setExpenses(fetchedExpenses);
-            setExpDate(getKSTYYYYMMDD(new Date()));
-          } catch (e) {
-            console.error(e);
-          } finally {
-            setIsLoading(false);
+        // 과거 7번의 반복 요일을 역추적하여 완료 여부 확인
+        while(occurrencesFound < 7 && dots.length < 30) { // 무한루프 방지
+          let dayJs = currentDate.getDay();
+          let dayUi = dayJs === 0 ? 6 : dayJs - 1; 
+          
+          if(habit.repeat_days.includes(dayUi)) {
+            const dateStr = getKSTYYYYMMDD(currentDate);
+            const isDone = habitLogs.some(log => log.habit_id === habit.id && log.completed_date === dateStr);
+            dots.unshift(isDone);
+            if(isDone) completedCount++;
+            occurrencesFound++;
           }
-        };
-        loadFinanceData();
-      }, [user.id, rangeInfo.yearMonth, rangeInfo.startStr, rangeInfo.endStr]);
+          currentDate.setDate(currentDate.getDate() - 1);
+        }
 
-      const handlePrevMonth = () => { const newD = new Date(currentDate); newD.setMonth(newD.getMonth() - 1); setCurrentDate(newD); };
-      const handleNextMonth = () => { const newD = new Date(currentDate); newD.setMonth(newD.getMonth() + 1); setCurrentDate(newD); };
-
-      const handleSaveBudget = async () => {
-        const numAmount = Number(budgetAmount) || 0;
-        await api.data.saveBudget(user.id, rangeInfo.yearMonth, numAmount);
-        setIsEditingBudget(false);
-      };
-
-      const handleAddExpense = async (e) => {
-        e.preventDefault();
-        if (!expDesc.trim() || !expAmount) return;
-        setIsSubmitting(true);
-        const newExp = { date: expDate, type: expType, description: expDesc, amount: Number(expAmount), is_receipted: false };
-        const savedExp = await api.data.saveExpense(user.id, newExp);
-        if (savedExp) setExpenses(prev => [savedExp, ...prev].sort((a,b) => a.date > b.date ? -1 : 1));
-        setExpDesc(''); setExpAmount(''); setIsSubmitting(false);
-      };
-
-      const handleDeleteExpense = async (id) => {
-        if (!confirm('정말 삭제하시겠습니까?')) return;
-        await api.data.deleteExpense(id);
-        setExpenses(prev => prev.filter(e => e.id !== id));
-      };
-
-      const handleToggleReceipt = async (id, currentStatus) => {
-        await api.data.toggleExpenseReceipt(id, !currentStatus);
-        setExpenses(prev => prev.map(e => e.id === id ? { ...e, is_receipted: !currentStatus } : e));
-      };
-
-      const totalExpense = expenses.filter(e => e.type === '지출').reduce((sum, e) => sum + Number(e.amount), 0);
-      const remainingBudget = (Number(budgetAmount) || 0) - totalExpense;
-      const totalUnpaidBills = expenses.filter(e => e.type === '청구' && !e.is_receipted).reduce((sum, e) => sum + Number(e.amount), 0);
-
-      if (isLoading) return <div className="py-12 flex justify-center"><Icon name="Loader2" className="animate-spin text-orange-500" size={32} /></div>;
-
-      return (
-        <div className="space-y-6 relative z-10">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Icon name="DollarSign" size={20} className="text-orange-500"/> 가계부</h2>
-              <p className="text-xs text-slate-400">목표 예산과 지출내역을 효율적으로 관리하세요.</p>
-            </div>
-            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 shrink-0">
-              <button onClick={handlePrevMonth} className="text-slate-400 hover:text-white p-1"><Icon name="ChevronLeft" size={18}/></button>
-              <div className="px-4 text-center">
-                <div className="text-sm font-bold text-white w-24">{rangeInfo.displayStr}</div>
-                <div className="text-[10px] text-slate-500 tracking-tighter">{rangeInfo.startStr} ~ {rangeInfo.endStr}</div>
-              </div>
-              <button onClick={handleNextMonth} className="text-slate-400 hover:text-white p-1"><Icon name="ChevronRight" size={18}/></button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-center">
-              <span className="text-xs text-slate-400 block mb-1">이번 달 목표 예산</span>
-              {isEditingBudget ? (
-                <div className="flex gap-2 mt-1">
-                  <input type="number" value={budgetAmount} onChange={e => setBudgetAmount(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-lg font-bold focus:outline-none focus:border-orange-500" autoFocus />
-                  <button onClick={handleSaveBudget} className="px-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold">저장</button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between mt-1 group">
-                  <span className="text-3xl font-black text-white">{Number(budgetAmount || 0).toLocaleString()}원</span>
-                  <button onClick={() => setIsEditingBudget(true)} className="text-slate-500 opacity-0 group-hover:opacity-100 transition"><Icon name="Edit2" size={18}/></button>
-                </div>
-              )}
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-              <span className="text-xs text-slate-400 block mb-1">남은 예산</span>
-              <span className={`text-3xl font-black mt-1 block ${remainingBudget < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                {remainingBudget < 0 ? '-' : ''}{Math.abs(remainingBudget).toLocaleString()}원
-              </span>
-              <p className="text-[10px] text-slate-500 mt-2">총 지출: {totalExpense.toLocaleString()}원</p>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl relative overflow-hidden">
-              <div className="absolute -right-4 -bottom-4 opacity-5"><Icon name="CreditCard" size={100}/></div>
-              <span className="text-xs text-slate-400 block mb-1 relative z-10">미결제 청구액 (영수 미체크)</span>
-              <span className="text-3xl font-black text-orange-400 mt-1 block relative z-10">{totalUnpaidBills.toLocaleString()}원</span>
-            </div>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
-            <h3 className="text-sm font-bold text-white mb-4">내역 등록</h3>
-            <form onSubmit={handleAddExpense} className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-              <input type="date" required value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500" />
-              <select value={expType} onChange={e => setExpType(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500">
-                <option value="지출">일반 지출</option>
-                <option value="청구">청구 (신용카드 등)</option>
-              </select>
-              <input type="text" required placeholder="지출/청구 내용" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full sm:col-span-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500" />
-              <div className="flex gap-2 w-full">
-                <input type="number" required placeholder="금액" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500" />
-                <button type="submit" disabled={isSubmitting} className="shrink-0 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold transition disabled:opacity-50"><Icon name="Plus" size={16}/></button>
-              </div>
-            </form>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white px-1">상세 내역</h3>
-            {expenses.length === 0 ? (
-               <div className="py-10 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl">
-                 <Icon name="FileText" size={40} className="text-slate-600 mb-2 mx-auto" />
-                 <p className="text-sm text-slate-400">등록된 내역이 없습니다.</p>
-               </div>
-            ) : (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
-                <div className="hidden sm:grid grid-cols-12 gap-2 p-4 bg-slate-950 border-b border-slate-800 text-xs font-semibold text-slate-400">
-                  <div className="col-span-2">날짜</div>
-                  <div className="col-span-2">유형</div>
-                  <div className="col-span-4">내용</div>
-                  <div className="col-span-3 text-right">금액</div>
-                  <div className="col-span-1 text-center">관리</div>
-                </div>
-                {expenses.map((exp) => (
-                  <div key={exp.id} className={`p-4 border-b border-slate-800/50 transition hover:bg-slate-800/30 flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:gap-2 items-start sm:items-center ${exp.is_receipted && exp.type==='청구' ? 'opacity-60' : ''}`}>
-                    <div className="col-span-2 text-xs text-slate-300 font-medium shrink-0">{exp.date}</div>
-                    <div className="col-span-2 flex shrink-0">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${exp.type === '청구' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>{exp.type}</span>
-                    </div>
-                    <div className="col-span-4 text-sm text-white font-medium w-full truncate">{exp.description}</div>
-                    <div className="col-span-3 text-sm font-bold w-full sm:text-right text-slate-200">{Number(exp.amount).toLocaleString()}원</div>
-                    <div className="col-span-1 flex items-center justify-end w-full gap-3 sm:justify-center">
-                      {exp.type === '청구' && (
-                        <label className="flex items-center gap-1.5 cursor-pointer" title="영수 완료">
-                          <input type="checkbox" checked={exp.is_receipted} onChange={() => handleToggleReceipt(exp.id, exp.is_receipted)} className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-orange-500 focus:ring-0" />
-                          <span className="text-[10px] text-slate-400 sm:hidden">영수(지불)</span>
-                        </label>
-                      )}
-                      <button onClick={() => handleDeleteExpense(exp.id)} className="text-slate-500 hover:text-red-400 p-1"><Icon name="Trash2" size={16}/></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    const StatsView = ({ plans, goals }) => {
-      const [filter, setFilter] = React.useState('weekly');
-      const completedPlans = plans.filter(p => p.status === 'completed');
-      const totalPlannedTime = plans.reduce((acc, p) => acc + (parseInt(p.durationPlanned, 10) || 0), 0);
-      const totalActualTime = completedPlans.reduce((acc, p) => acc + (parseInt(p.durationActual, 10) || 0), 0);
-      const completionRate = plans.length > 0 ? Math.round((completedPlans.length / plans.length) * 100) : 0;
-
-      return (
-        <div className="space-y-6 relative z-10">
-          <div className="flex justify-between items-center">
-            <div><h2 className="text-xl font-bold text-white">통계 리포트</h2><p className="text-xs text-slate-400">달성 추이와 투입 시간을 모니터링합니다.</p></div>
-            <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs">
-              {['weekly', 'monthly', 'yearly'].map(type => (
-                <button key={type} onClick={() => setFilter(type)} className={`px-3 py-1.5 rounded-lg capitalize ${filter === type ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white transition'}`}>
-                  {type === 'weekly' ? '주간' : type === 'monthly' ? '월간' : '연간'}
-                </button>
+        return (
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className="text-[10px] font-bold text-slate-400">7회 중 <span className="text-blue-600">{completedCount}</span>회</span>
+            <div className="flex gap-1">
+              {dots.map((done, i) => (
+                <div key={i} className={`w-2 h-2 rounded-full ${done ? 'bg-blue-500' : 'bg-slate-200'}`} />
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">종합 달성률</span><span className="text-3xl font-black text-orange-400">{completionRate}%</span><p className="text-[10px] text-slate-500 mt-2">총 {plans.length}개 계획 중 {completedPlans.length}개 완료</p></div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">계획된 목표 시간</span><span className="text-3xl font-black text-white">{formatTime(totalPlannedTime)}</span></div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span className="text-xs text-slate-400 block mb-1">실제 순수 투입 시간</span><span className="text-3xl font-black text-emerald-400">{formatTime(totalActualTime)}</span></div>
+        );
+      };
+
+      return (
+        <div>
+          <div className="flex bg-white rounded-xl p-1 shadow-sm mb-6 border border-slate-200">
+            {['월', '화', '수', '목', '금', '토', '일'].map((day, idx) => (
+              <button key={idx} onClick={() => setSelectedDay(idx)} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${selectedDay === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
+                {day}
+              </button>
+            ))}
           </div>
+
+          <div className="space-y-3">
+            {filteredHabits.map(habit => {
+              const isTodayCompleted = habitLogs.some(log => log.habit_id === habit.id && log.completed_date === todayStr);
+              return (
+                <div key={habit.id} className={`flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm transition ${isTodayCompleted ? 'opacity-60 bg-slate-50' : ''}`}>
+                  <button onClick={() => toggleCheck(habit)} className={`shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition ${isTodayCompleted ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 hover:border-blue-400'}`}>
+                    {isTodayCompleted && <Icon name="Check" size={16} />}
+                  </button>
+                  <div className="flex-1 flex flex-col justify-center cursor-pointer" onClick={() => openModal(habit)}>
+                    <div className={`font-bold ${isTodayCompleted ? 'line-through text-slate-500' : 'text-slate-900'}`}>{habit.title}</div>
+                    {habit.exec_time && <div className="text-xs text-blue-600 font-semibold mt-0.5"><Icon name="Clock" size={12} className="mr-0.5 mb-0.5 inline" />{habit.exec_time.slice(0,5)}</div>}
+                  </div>
+                  {renderDots(habit)}
+                </div>
+              );
+            })}
+            <button onClick={() => openModal()} className="w-full py-4 border-2 border-dashed border-slate-300 text-slate-500 font-bold rounded-xl hover:border-blue-500 hover:text-blue-600 transition bg-slate-50 flex justify-center items-center gap-2">
+              <Icon name="Plus" size={20} /> 새 습관 추가
+            </button>
+          </div>
+
+          <CustomModal isOpen={isModalOpen} title={editHabit ? "습관 수정" : "새 습관"} onClose={() => setIsModalOpen(false)}>
+            <HabitForm habit={editHabit} onSave={doSaveHabit} onDelete={doDeleteHabit} />
+          </CustomModal>
         </div>
       );
     };
 
-    const MemoModal = ({ isOpen, onClose, onSave, memo }) => {
-      const [title, setTitle] = React.useState('');
-      const [content, setContent] = React.useState('');
-      const [date, setDate] = React.useState(getKSTYYYYMMDD(new Date()));
-      const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-      React.useEffect(() => {
-        if (memo) {
-          setTitle(memo.title || '');
-          setContent(memo.content || '');
-          setDate(memo.date || getKSTYYYYMMDD(new Date()));
-        } else {
-          setTitle('');
-          setContent('');
-          setDate(getKSTYYYYMMDD(new Date()));
-        }
-        setIsSubmitting(false);
-      }, [memo, isOpen]);
-
-      if (!isOpen) return null;
-
-      const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (isSubmitting) return;
-        setIsSubmitting(true);
-        try {
-          await onSave({ id: memo?.id, title, content, date, sort_order: memo?.sort_order });
-          onClose();
-        } finally {
-          setIsSubmitting(false);
-        }
-      };
+    const HabitForm = ({ habit, onSave, onDelete }) => {
+      const [title, setTitle] = React.useState(habit?.title || '');
+      const [time, setTime] = React.useState(habit?.exec_time?.slice(0,5) || '');
+      const [days, setDays] = React.useState(habit?.repeat_days || [0,1,2,3,4,5,6]);
+      
+      const toggleDay = (d) => setDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort());
+      const handleSubmit = (e) => { e.preventDefault(); onSave({ id: habit?.id, title, time, repeatDays: days }); };
 
       return (
-        <CustomModal isOpen={isOpen} title={memo ? "메모 수정" : "새 메모 작성"} onClose={onClose}>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">메모 제목</label>
-              <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목을 입력하세요" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">습관명</label>
+            <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-900" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">시간 (선택)</label>
+            <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-900" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-2">반복 요일</label>
+            <div className="flex gap-1">
+              {['월', '화', '수', '목', '금', '토', '일'].map((d, i) => (
+                <button type="button" key={i} onClick={() => toggleDay(i)} className={`flex-1 py-2 text-sm font-bold rounded-lg border-2 transition ${days.includes(i) ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 text-slate-400 hover:border-blue-300'}`}>{d}</button>
+              ))}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">작성 일자</label>
-              <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">메모 내용</label>
-              <textarea required rows="6" value={content} onChange={(e) => setContent(e.target.value)} placeholder="내용을 자세히 기록하세요..." className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-orange-500 custom-scrollbar"></textarea>
-            </div>
-            <div className="pt-2 flex justify-end gap-2 border-t border-slate-800">
-              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 rounded-lg disabled:opacity-50">취소</button>
-              <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 rounded-lg shadow-lg shadow-orange-600/20 disabled:opacity-50">{isSubmitting ? '저장 중...' : '저장하기'}</button>
-            </div>
-          </form>
-        </CustomModal>
+          </div>
+          <div className="pt-4 flex gap-2">
+            {habit && <button type="button" onClick={() => onDelete(habit.id)} className="px-4 py-3 bg-red-50 text-red-500 font-bold rounded-xl hover:bg-red-100 transition"><Icon name="Trash2" size={18} /></button>}
+            <button type="submit" disabled={!title || days.length===0} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition shadow-md">저장하기</button>
+          </div>
+        </form>
       );
     };
 
-    const MemoView = ({ memos, onSaveMemo, onDeleteMemo, onUpdateOrders }) => {
-      const [isModalOpen, setIsModalOpen] = React.useState(false);
-      const [selectedMemo, setSelectedMemo] = React.useState(null);
-      const [memoToDelete, setMemoToDelete] = React.useState(null);
-      const [isDeleting, setIsDeleting] = React.useState(false);
+    const StatsView = ({ goals, plans, habits }) => {
+      const activeGoals = goals.filter(g => !g.is_completed).length;
+      const completedGoals = goals.filter(g => g.is_completed).length;
+      const completedPlans = plans.filter(p => p.status === 'completed').length;
       
-      const [localMemos, setLocalMemos] = React.useState([]);
-      const [draggedIndex, setDraggedIndex] = React.useState(null);
-      const [draggedOverIndex, setDraggedOverIndex] = React.useState(null);
-
-      React.useEffect(() => {
-        setLocalMemos([...memos]);
-      }, [memos]);
-
-      const confirmDelete = async () => {
-        if (memoToDelete) {
-          setIsDeleting(true);
-          try { await onDeleteMemo(memoToDelete); } 
-          finally { setMemoToDelete(null); setIsDeleting(false); setIsModalOpen(false); }
-        }
-      };
-
-      const handleDragStart = (e, index) => { setDraggedIndex(index); e.dataTransfer.effectAllowed = "move"; };
-      const handleDragOver = (e, index) => { e.preventDefault(); if (draggedIndex !== null && draggedIndex !== index) setDraggedOverIndex(index); };
-      const handleDrop = (e, index) => {
-        e.preventDefault();
-        if (draggedIndex === null || draggedIndex === index) return;
-        const updated = [...localMemos]; 
-        const item = updated.splice(draggedIndex, 1)[0]; 
-        updated.splice(index, 0, item);
-        setLocalMemos(updated);
-        onUpdateOrders(updated);
-        setDraggedIndex(null); 
-        setDraggedOverIndex(null);
-      };
-      const handleDragEnd = () => { setDraggedIndex(null); setDraggedOverIndex(null); };
-
       return (
-        <div className="space-y-6 relative z-10">
-          <ConfirmModal isOpen={!!memoToDelete} message="메모를 완전히 삭제하시겠습니까?" onConfirm={confirmDelete} onClose={() => setMemoToDelete(null)} isProcessing={isDeleting} />
-          <MemoModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={onSaveMemo} memo={selectedMemo} />
-          
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Icon name="FileText" size={20} className="text-orange-500"/> 자유 메모</h2>
-              <p className="text-xs text-slate-400">자유롭게 아이디어를 기록하고 드래그하여 순서를 변경하세요.</p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center">
+              <div className="text-slate-400 mb-2"><Icon name="Target" size={24} /></div>
+              <div className="text-3xl font-black text-slate-900 mb-1">{activeGoals}</div>
+              <div className="text-xs font-bold text-slate-500">진행 중 목표</div>
             </div>
-            <button onClick={() => { setSelectedMemo(null); setIsModalOpen(true); }} className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-xl flex items-center gap-1.5 shadow-lg shadow-orange-600/20"><Icon name="Plus" size={16} /> 새 메모</button>
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center">
+              <div className="text-blue-500 mb-2"><Icon name="Award" size={24} /></div>
+              <div className="text-3xl font-black text-blue-600 mb-1">{completedGoals}</div>
+              <div className="text-xs font-bold text-slate-500">달성한 목표</div>
+            </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {localMemos.length === 0 ? (
-               <div className="col-span-full py-12 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl">
-                 <Icon name="FileText" size={40} className="text-slate-600 mb-2 mx-auto" />
-                 <p className="text-sm text-slate-400">등록된 메모가 없습니다.</p>
-               </div>
-            ) : (
-              localMemos.map((memo, idx) => (
-                <div 
-                  key={memo.id} 
-                  draggable 
-                  onDragStart={(e) => handleDragStart(e, idx)} 
-                  onDragOver={(e) => handleDragOver(e, idx)} 
-                  onDrop={(e) => handleDrop(e, idx)} 
-                  onDragEnd={handleDragEnd}
-                  className={`bg-slate-900 border border-slate-800 p-5 rounded-2xl transition flex flex-col justify-between cursor-pointer hover:border-slate-700 relative group ${draggedOverIndex === idx ? 'border-orange-500 bg-slate-800/50' : ''} ${draggedIndex === idx ? 'opacity-50' : ''}`}
-                  onClick={() => { setSelectedMemo(memo); setIsModalOpen(true); }}
-                >
-                  <div className="absolute top-4 right-4 text-slate-600 group-hover:text-slate-400 transition cursor-grab"><Icon name="GripHorizontal" size={16}/></div>
-                  <div>
-                    <h3 className="font-bold text-base text-white mb-2 pr-6 line-clamp-1 group-hover:text-orange-400 transition">{memo.title}</h3>
-                    <p className="text-xs text-slate-400 line-clamp-3 mb-4">{memo.content}</p>
-                  </div>
-                  <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
-                    <span>{memo.date}</span>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setMemoToDelete(memo.id); }} className="hover:text-red-400 p-1 transition rounded"><Icon name="Trash2" size={14} /></button>
-                  </div>
-                </div>
-              ))
-            )}
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 shadow-lg text-white">
+            <div className="flex items-center gap-2 mb-4 text-blue-400"><Icon name="Zap" size={20} /> <span className="font-bold">실행력 배터리</span></div>
+            <div className="flex items-end gap-2">
+              <span className="text-5xl font-black">{completedPlans}</span>
+              <span className="text-slate-400 font-semibold mb-1">개의 계획을 완료했습니다!</span>
+            </div>
           </div>
         </div>
       );
@@ -1447,165 +613,78 @@
       const [plans, setPlans] = React.useState([]);
       const [habits, setHabits] = React.useState([]);
       const [habitLogs, setHabitLogs] = React.useState([]);
-      const [memos, setMemos] = React.useState([]);
-      const [isResetModalOpen, setIsResetModalOpen] = React.useState(false);
-      
-      const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
-      const dropdownRef = React.useRef(null);
 
-      React.useEffect(() => {
-        const handleClickOutside = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsDropdownOpen(false); };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-      }, []);
-
-      React.useEffect(() => {
-        const handleHashChange = () => { const hash = window.location.hash; if (hash && (hash.includes('type=recovery') || hash.includes('access_token='))) setIsResetModalOpen(true); };
-        handleHashChange(); window.addEventListener('hashchange', handleHashChange);
-        return () => window.removeEventListener('hashchange', handleHashChange);
-      }, []);
+      const loadData = async (uid) => {
+        try {
+          const [g, p, h, hl] = await Promise.all([
+            api.data.getGoals(uid), api.data.getPlans(uid), api.data.getHabits(uid), api.data.getHabitLogs(uid)
+          ]);
+          setGoals(g); setPlans(p); setHabits(h); setHabitLogs(hl);
+        } catch (e) { console.error(e); }
+      };
 
       React.useEffect(() => {
         let mounted = true;
-        const initAuth = async () => {
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData?.session?.user && mounted) { setUser(sessionData.session.user); await loadUserData(sessionData.session.user.id); } 
-          else if (mounted) { setIsLoading(false); }
+        const init = async () => {
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.user && mounted) {
+            setUser(data.session.user);
+            await loadData(data.session.user.id);
+          }
+          if (mounted) setIsLoading(false);
         };
-        initAuth();
+        init();
 
-        let authListener = null;
-        if (supabase) {
-          const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session?.user && mounted) { setUser(session.user); await loadUserData(session.user.id); } 
-            else if (event === 'SIGNED_OUT' && mounted) { setUser(null); setGoals([]); setPlans([]); setHabits([]); setHabitLogs([]); setMemos([]); setIsLoading(false); }
-          });
-          authListener = data;
-        }
-        return () => { mounted = false; if (authListener) authListener.subscription.unsubscribe(); };
+        const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_IN' && session?.user && mounted) {
+            setUser(session.user); await loadData(session.user.id);
+          } else if (event === 'SIGNED_OUT' && mounted) {
+            setUser(null); setGoals([]); setPlans([]); setHabits([]); setHabitLogs([]);
+          }
+        });
+        return () => { mounted = false; listener?.subscription.unsubscribe(); };
       }, []);
 
-      const loadUserData = async (userId) => {
-        setIsLoading(true);
-        try {
-          const [userGoals, userPlans, userHabits, userHabitLogs, userMemos] = await Promise.all([ 
-            api.data.getGoals(userId), 
-            api.data.getPlans(userId), 
-            api.data.getHabits(userId), 
-            api.data.getHabitLogs(userId),
-            api.data.getMemos(userId)
-          ]);
-          setGoals(userGoals); setPlans(userPlans); setHabits(userHabits); setHabitLogs(userHabitLogs); setMemos(userMemos);
-        } catch (e) {} finally { setIsLoading(false); }
-      };
+      if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Icon name="Loader2" size={32} className="animate-spin text-blue-600" /></div>;
+      if (!user) return <AuthView onLoginSuccess={(u) => { setUser(u); loadData(u.id); }} />;
 
-      const handleSaveGoal = async (goal) => {
-        try { const saved = await api.data.saveGoal(user.id, goal); setGoals(prev => prev.findIndex(g => g.id === saved.id) >= 0 ? prev.map(g => g.id === saved.id ? saved : g) : [...prev, saved]); } 
-        catch (e) {}
-      };
-      const handleToggleGoalComplete = async (goal) => {
-        const updatedGoal = { ...goal, is_completed: !goal.is_completed }; setGoals(prev => prev.map(g => g.id === goal.id ? updatedGoal : g)); 
-        try { await api.data.saveGoal(user.id, updatedGoal); } catch(e) { setGoals(prev => prev.map(g => g.id === goal.id ? goal : g)); }
-      };
-      const handleDeleteGoal = async (goalId) => { try { await api.data.deleteGoal(goalId); setGoals(prev => prev.filter(g => g.id !== goalId)); } catch(e) {} };
-
-      const handleSavePlan = async (plan) => { try { const saved = await api.data.savePlan(user.id, plan); setPlans(prev => [saved, ...prev]); return saved; } catch(e) { throw e; } };
-      const handleUpdatePlan = async (plan) => { setPlans(prev => prev.map(p => p.id === plan.id ? plan : p)); try { await api.data.savePlan(user.id, plan); } catch(e) {} };
-      const handleDeletePlan = async (planId) => { try { await api.data.deletePlan(planId); setPlans(prev => prev.filter(p => p.id !== planId)); } catch(e) {} };
-
-      const handleSaveHabit = async (habit) => {
-        try { const saved = await api.data.saveHabit(user.id, habit); if (saved) { const refreshedHabits = await api.data.getHabits(user.id); setHabits(refreshedHabits); } } 
-        catch(e) {}
-      };
-      const handleDeleteHabit = async (habitId) => { try { await api.data.deleteHabit(habitId); setHabits(prev => prev.filter(h => h.id !== habitId)); } catch(e) {} };
-      
-      const handleToggleHabitLog = async (habitId, dateStr, isCompleted) => {
-        const previousLogs = [...habitLogs];
-        if (isCompleted) setHabitLogs(prev => prev.filter(log => !(log.habitId === habitId && log.date === dateStr)));
-        else setHabitLogs(prev => [...prev, { id: crypto.randomUUID(), habitId, userId: user.id, date: dateStr }]);
-        const result = await api.data.toggleHabitLog(user.id, habitId, dateStr, isCompleted);
-        if (result && result.error) setHabitLogs(previousLogs);
-      };
-
-      const handleSaveMemo = async (memo) => {
-        try { const saved = await api.data.saveMemo(user.id, memo); setMemos(prev => prev.findIndex(m => m.id === saved.id) >= 0 ? prev.map(m => m.id === saved.id ? saved : m).sort((a,b)=>a.sort_order - b.sort_order) : [...prev, saved].sort((a,b)=>a.sort_order - b.sort_order)); }
-        catch (e) {}
-      };
-      const handleDeleteMemo = async (memoId) => { try { await api.data.deleteMemo(memoId); setMemos(prev => prev.filter(m => m.id !== memoId)); } catch(e) {} };
-      const handleUpdateMemoOrders = async (updatedMemos) => {
-        setMemos(updatedMemos);
-        api.data.updateMemoOrders(updatedMemos);
-      };
-
-      if (isLoading) {
-        return (
-          <div className="min-h-screen bg-black flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3"><Icon name="Loader2" className="animate-spin text-orange-500" size={40} /><p className="text-sm font-semibold text-orange-500">데이터를 불러오는 중입니다...</p></div>
-          </div>
-        );
-      }
-
-      if (!user) return <><AuthView onLoginSuccess={async (u) => { setUser(u); await loadUserData(u.id); }} /><ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} /></>;
+      const tabs = [
+        { id: 'goals', label: '목표', icon: 'Target' },
+        { id: 'execution', label: '계획', icon: 'Edit3' },
+        { id: 'journal', label: '실행', icon: 'CheckSquare' },
+        { id: 'habits', label: '습관', icon: 'Activity' },
+        { id: 'stats', label: '통계', icon: 'BarChart2' }
+      ];
 
       return (
-        <div className="min-h-screen flex flex-col bg-black text-slate-100">
-          <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+        <div className="min-h-screen flex flex-col">
+          <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
             <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-16">
-              <div className="flex items-center gap-2 mr-2 shrink-0">
-                <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center text-white font-black">최</div>
-                <span className="font-bold text-white text-sm hidden sm:inline">최강 목표</span>
+              <div className="flex items-center gap-2 shrink-0 pr-4">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black shadow-sm">최</div>
+                <span className="font-bold text-slate-900 text-sm hidden sm:inline">최강 목표</span>
               </div>
-              
-              <div className="flex items-center flex-1 justify-end gap-1 sm:gap-2">
-                <nav className="flex space-x-1 sm:space-x-2">
-                  {[
-                    { id: 'goals', label: '목표', icon: 'Target' },
-                    { id: 'execution', label: '계획', icon: 'Edit3' },
-                    { id: 'journal', label: '실행', icon: 'CheckSquare' },
-                    { id: 'habits', label: '습관', icon: 'Activity' }
-                  ].map(tab => (
-                    <button key={tab.id} onClick={() => setCurrentTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${currentTab === tab.id ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+              <div className="flex items-center flex-1 justify-end gap-1 overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
+                <nav className="flex space-x-1">
+                  {tabs.map(tab => (
+                    <button key={tab.id} onClick={() => setCurrentTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all ${currentTab === tab.id ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
                       <Icon name={tab.icon} size={15} /> <span className="hidden xs:inline">{tab.label}</span>
                     </button>
                   ))}
                 </nav>
-
-                <div className="relative" ref={dropdownRef}>
-                  <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${['stats', 'finance', 'memo'].includes(currentTab) ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
-                    <Icon name="MoreVertical" size={15} /> <span className="hidden xs:inline">더보기</span>
-                  </button>
-                  {isDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden z-50 animate-fadeIn">
-                      <button onClick={() => { setCurrentTab('stats'); setIsDropdownOpen(false); }} className="w-full text-left px-4 py-3 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition">
-                        <Icon name="BarChart2" size={15} /> 통계 리포트
-                      </button>
-                      <button onClick={() => { setCurrentTab('finance'); setIsDropdownOpen(false); }} className="w-full text-left px-4 py-3 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition">
-                        <Icon name="DollarSign" size={15} /> 가계부 관리
-                      </button>
-                      <button onClick={() => { setCurrentTab('memo'); setIsDropdownOpen(false); }} className="w-full text-left px-4 py-3 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition">
-                        <Icon name="FileText" size={15} /> 자유 메모
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="w-px h-6 bg-slate-800 mx-1"></div>
-                <button onClick={() => { api.auth.signOut(); setUser(null); }} className="text-slate-500 hover:text-slate-300 p-2 rounded-lg shrink-0" title="로그아웃"><Icon name="LogOut" size={18} /></button>
+                <div className="w-px h-6 bg-slate-200 mx-2 shrink-0"></div>
+                <button onClick={api.auth.signOut} className="text-slate-400 hover:text-red-500 p-2 rounded-lg shrink-0 transition" title="로그아웃"><Icon name="LogOut" size={18} /></button>
               </div>
             </div>
           </header>
 
-          <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 pb-20">
-            {currentTab === 'goals' && <GoalsView goals={goals} onSaveGoal={handleSaveGoal} onToggleComplete={handleToggleGoalComplete} onDeleteGoal={handleDeleteGoal} />}
-            {currentTab === 'execution' && <ExecutionView goals={goals} onSavePlan={handleSavePlan} />}
-            {currentTab === 'journal' && <JournalView plans={plans} goals={goals} onUpdatePlan={handleUpdatePlan} onDeletePlan={handleDeletePlan} />}
-            {currentTab === 'habits' && <HabitsView habits={habits} habitLogs={habitLogs} onSaveHabit={handleSaveHabit} onDeleteHabit={handleDeleteHabit} onToggleHabitLog={handleToggleHabitLog} />}
-            {currentTab === 'stats' && <StatsView plans={plans} goals={goals} />}
-            {currentTab === 'finance' && <FinanceView user={user} />}
-            {currentTab === 'memo' && <MemoView memos={memos} onSaveMemo={handleSaveMemo} onDeleteMemo={handleDeleteMemo} onUpdateOrders={handleUpdateMemoOrders} />}
+          <main className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 pb-20">
+            {currentTab === 'goals' && <GoalsView goals={goals} onUpdate={g => setGoals(prev => prev.some(x=>x.id===g.id) ? prev.map(x=>x.id===g.id?g:x) : [...prev,g])} onDelete={id => setGoals(prev => prev.filter(x=>x.id!==id))} user={user} />}
+            {currentTab === 'execution' && <ExecutionView goals={goals} onPlanSaved={p => setPlans(prev => [p, ...prev])} user={user} />}
+            {currentTab === 'journal' && <JournalView plans={plans} goals={goals} onUpdatePlan={p => setPlans(prev => prev.map(x=>x.id===p.id?p:x))} user={user} />}
+            {currentTab === 'habits' && <HabitsView habits={habits} habitLogs={habitLogs} onUpdate={h => setHabits(prev => prev.some(x=>x.id===h.id) ? prev.map(x=>x.id===h.id?h:x) : [...prev,h])} onDelete={id => setHabits(prev => prev.filter(x=>x.id!==id))} onLogUpdate={() => api.data.getHabitLogs(user.id).then(setHabitLogs)} user={user} />}
+            {currentTab === 'stats' && <StatsView goals={goals} plans={plans} habits={habits} />}
           </main>
-
-          <ResetPasswordModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} />
         </div>
       );
     };
