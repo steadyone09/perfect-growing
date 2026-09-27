@@ -44,8 +44,8 @@
         return c;
       })();
       const toast = document.createElement('div');
-      toast.className = 'bg-white border border-slate-200 text-slate-800 px-5 py-4 rounded-xl shadow-lg shadow-slate-200/50 flex items-start gap-3 text-sm animate-fadeIn break-all';
-      toast.innerHTML = `<svg class="shrink-0 mt-0.5 text-blue-600" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> <div>${msg}</div>`;
+      toast.className = 'bg-slate-800 border border-slate-700 text-white px-5 py-4 rounded-xl shadow-lg shadow-slate-900/50 flex items-start gap-3 text-sm animate-fadeIn break-all';
+      toast.innerHTML = `<svg class="shrink-0 mt-0.5 text-blue-400" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> <div>${msg}</div>`;
       container.appendChild(toast);
       setTimeout(() => {
         toast.style.opacity = '0';
@@ -77,6 +77,7 @@
       return <span ref={spanRef} className={`inline-flex items-center justify-center ${className}`} />;
     };
 
+    // 한글 IME 입력 씹힘 방지용 커스텀 입력 컴포넌트
     const BlurInput = ({ value, onChange, ...props }) => {
       const [localVal, setLocalVal] = React.useState(value);
       React.useEffect(() => { setLocalVal(value); }, [value]);
@@ -95,9 +96,10 @@
         signOut: async () => await supabase.auth.signOut(),
       },
       data: {
+        // [목표] API - userId (카멜케이스)
         getGoals: async (userId) => {
           const { data, error } = await supabase.from('goals').select('*').eq('userId', userId).order('created_at', { ascending: true });
-          if (error) { window.customAlert(`목표 조회 에러: ${error.message}`); return []; }
+          if (error) { window.customAlert(`목표 조회 에러: ${error.message}`); throw error; }
           return data || [];
         },
         saveGoal: async (goalData, userId) => {
@@ -105,61 +107,80 @@
           const { data, error } = payload.id 
             ? await supabase.from('goals').update(payload).eq('id', payload.id).eq('userId', userId).select()
             : await supabase.from('goals').insert(payload).select();
-          if (error) throw error;
+          if (error) { window.customAlert(`목표 저장 에러: ${error.message}`); throw error; }
           return data[0];
         },
         deleteGoal: async (id, userId) => {
           const { error } = await supabase.from('goals').delete().eq('id', id).eq('userId', userId);
-          if (error) throw error;
+          if (error) { window.customAlert(`목표 삭제 에러: ${error.message}`); throw error; }
         },
+        
+        // [마일스톤] API - userId (카멜케이스) 복구됨
+        getMilestones: async (userId) => {
+          const { data, error } = await supabase.from('goal_milestones').select('*').eq('userId', userId).order('created_at', { ascending: true });
+          if (error) { window.customAlert(`마일스톤 조회 에러: ${error.message}`); throw error; }
+          return data || [];
+        },
+        saveMilestone: async (msData, userId) => {
+          const payload = { ...msData, userId };
+          const { data, error } = payload.id 
+            ? await supabase.from('goal_milestones').update(payload).eq('id', payload.id).eq('userId', userId).select()
+            : await supabase.from('goal_milestones').insert(payload).select();
+          if (error) { window.customAlert(`마일스톤 저장 에러: ${error.message}`); throw error; }
+          return data[0];
+        },
+        deleteMilestone: async (id, userId) => {
+          const { error } = await supabase.from('goal_milestones').delete().eq('id', id).eq('userId', userId);
+          if (error) { window.customAlert(`마일스톤 삭제 에러: ${error.message}`); throw error; }
+        },
+
+        // [계획] API - userId (카멜케이스), timeMemo 제외
         getPlans: async (userId) => {
           const { data, error } = await supabase.from('plans').select('*').eq('userId', userId).order('created_at', { ascending: false });
-          if (error) { window.customAlert(`계획 조회 에러: ${error.message}`); return []; }
+          if (error) { window.customAlert(`계획 조회 에러: ${error.message}`); throw error; }
           return data || [];
         },
         savePlan: async (planData, userId) => {
-          const { timeMemo, ...rest } = planData; 
+          const { timeMemo, ...rest } = planData; // timeMemo 제거 방어
           const payload = { ...rest, userId };
           const { data, error } = payload.id 
             ? await supabase.from('plans').update(payload).eq('id', payload.id).eq('userId', userId).select()
             : await supabase.from('plans').insert(payload).select();
-          if (error) throw error;
+          if (error) { window.customAlert(`계획 저장 에러: ${error.message}`); throw error; }
           return data[0];
         },
         deletePlan: async (id, userId) => {
           const { error } = await supabase.from('plans').delete().eq('id', id).eq('userId', userId);
-          if (error) throw error;
+          if (error) { window.customAlert(`계획 삭제 에러: ${error.message}`); throw error; }
         },
+
+        // [습관] API - user_id (스네이크케이스)
         getHabits: async (userId) => {
           const { data, error } = await supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true });
-          if (error) { window.customAlert(`습관 조회 에러: ${error.message}`); return []; }
+          if (error) { window.customAlert(`습관 조회 에러: ${error.message}`); throw error; }
           return data || [];
         },
         saveHabit: async (habitData, userId) => {
-          const payload = { title: habitData.title, exec_time: habitData.time || null, repeat_days: habitData.repeatDays, user_id: userId };
+          const payload = { 
+            title: habitData.title, 
+            exec_time: habitData.exec_time === "" ? null : habitData.exec_time, 
+            repeat_days: habitData.repeat_days, 
+            user_id: userId 
+          };
           const { data, error } = habitData.id 
             ? await supabase.from('habits').update(payload).eq('id', habitData.id).eq('user_id', userId).select()
             : await supabase.from('habits').insert(payload).select();
-          if (error) throw error;
+          if (error) { window.customAlert(`습관 저장 에러: ${error.message}`); throw error; }
           return data[0];
         },
         deleteHabit: async (id, userId) => {
           const { error } = await supabase.from('habits').delete().eq('id', id).eq('user_id', userId);
-          if (error) throw error;
+          if (error) { window.customAlert(`습관 삭제 에러: ${error.message}`); throw error; }
         },
         getHabitLogs: async (userId) => {
           const { data, error } = await supabase.from('habit_logs').select('*').eq('user_id', userId);
-          if (error) { window.customAlert(`습관 기록 에러: ${error.message}`); return []; }
+          if (error) { window.customAlert(`습관 기록 조회 에러: ${error.message}`); throw error; }
           return data || [];
-        },
-        toggleHabitLog: async (habitId, userId, dateStr, isCompleted) => {
-          if (isCompleted) {
-            const { error } = await supabase.from('habit_logs').upsert({ habit_id: habitId, user_id: userId, completed_date: dateStr, is_completed: true });
-            if (error) throw error;
-          } else {
-            const { error } = await supabase.from('habit_logs').delete().eq('habit_id', habitId).eq('completed_date', dateStr).eq('user_id', userId);
-            if (error) throw error;
-          }
         }
       }
     };
@@ -199,9 +220,59 @@
     const generateGoogleCalendarLink = (title, details, startTimeText) => {
       const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
       const text = encodeURIComponent(title);
-      const dates = '20261231T090000Z/20261231T100000Z'; // 임시 날짜 (실제 앱에서는 startTimeText 파싱 후 KST->UTC 변환 필요)
       const detailsParam = encodeURIComponent(details);
-      return `${baseUrl}&text=${text}&dates=${dates}&details=${detailsParam}`;
+      
+      let datesParam = '';
+      if (startTimeText) {
+        const today = getKSTDate();
+        const [hours, minutes] = startTimeText.split(':').map(Number);
+        
+        let startValid = true;
+        if (isNaN(hours) || isNaN(minutes)) startValid = false;
+
+        if (startValid) {
+          today.setHours(hours, minutes, 0, 0);
+          const endDate = new Date(today.getTime() + 30 * 60000); // 30분 기본
+
+          const formatToUTC = (d) => {
+            return d.toISOString().replace(/-|:|\.\d\d\d/g, '');
+          };
+          datesParam = `&dates=${formatToUTC(today)}/${formatToUTC(endDate)}`;
+        }
+      }
+      return `${baseUrl}&text=${text}${datesParam}&details=${detailsParam}`;
+    };
+
+    const handleAppleCalendarSync = (title, details, startTimeText) => {
+      let startDate = getKSTDate();
+      let endDate = new Date(startDate.getTime() + 30 * 60000);
+
+      if (startTimeText) {
+        const [hours, minutes] = startTimeText.split(':').map(Number);
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          startDate.setHours(hours, minutes, 0, 0);
+          endDate = new Date(startDate.getTime() + 30 * 60000);
+        }
+      }
+
+      const formatDate = (date) => {
+        return date.toISOString().replace(/-|:|\.\d\d\d/g, '');
+      };
+
+      const icsData = [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//My App//EN',
+        'BEGIN:VEVENT',
+        `DTSTART:${formatDate(startDate)}`,
+        `DTEND:${formatDate(endDate)}`,
+        `SUMMARY:${title.replace(/,/g, '\\,').replace(/;/g, '\\;')}`,
+        `DESCRIPTION:${details.replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')}`,
+        'END:VEVENT', 'END:VCALENDAR'
+      ].join('\r\n');
+
+      const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 100);
     };
 
     const AuthView = ({ onLoginSuccess }) => {
@@ -232,7 +303,7 @@
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 ml-1">비밀번호</label>
                 <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500 transition" />
               </div>
-              <button type="submit" disabled={loading} className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md mt-4">
+              <button type="submit" disabled={loading} className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md mt-4 disabled:opacity-50">
                 {loading ? '로그인 중...' : '시작하기'}
               </button>
             </form>
@@ -241,61 +312,115 @@
       );
     };
 
-    const GoalsView = ({ goals, onUpdate, onDelete, user }) => {
+    const GoalsView = ({ goals, milestones, onUpdateGoal, onDeleteGoal, onUpdateMilestone, onDeleteMilestone, user }) => {
       const [title, setTitle] = React.useState('');
       const [saving, setSaving] = React.useState(false);
-      const [confirmObj, setConfirmObj] = React.useState({ isOpen: false, id: null });
+      const [confirmObj, setConfirmObj] = React.useState({ isOpen: false, id: null, type: null });
 
-      const handleAdd = async (e) => {
+      // 마일스톤 입력 상태 (goal id 기준 객체)
+      const [msInputs, setMsInputs] = React.useState({});
+
+      const handleAddGoal = async (e) => {
         e.preventDefault(); if (!title.trim() || saving) return;
         setSaving(true);
         try {
           const newGoal = await api.data.saveGoal({ title, is_completed: false }, user.id);
-          onUpdate(newGoal); setTitle('');
-        } catch (e) { window.customAlert(e.message); }
+          onUpdateGoal(newGoal); setTitle('');
+        } catch (e) { /* error handled in api */ }
         finally { setSaving(false); }
       };
 
-      const toggleComplete = async (goal) => {
+      const toggleGoalComplete = async (goal) => {
         try {
           const updated = await api.data.saveGoal({ id: goal.id, is_completed: !goal.is_completed }, user.id);
-          onUpdate(updated);
-        } catch (e) { window.customAlert(e.message); }
+          onUpdateGoal(updated);
+        } catch (e) {}
+      };
+
+      const handleAddMilestone = async (e, goalId) => {
+        e.preventDefault();
+        const msTitle = msInputs[goalId];
+        if (!msTitle?.trim()) return;
+        try {
+          const newMs = await api.data.saveMilestone({ title: msTitle, goal_id: goalId, is_completed: false }, user.id);
+          onUpdateMilestone(newMs);
+          setMsInputs(prev => ({ ...prev, [goalId]: '' }));
+        } catch (e) {}
+      };
+
+      const toggleMilestoneComplete = async (ms) => {
+        try {
+          const updated = await api.data.saveMilestone({ id: ms.id, is_completed: !ms.is_completed }, user.id);
+          onUpdateMilestone(updated);
+        } catch (e) {}
       };
 
       const doDelete = async () => {
         try {
-          await api.data.deleteGoal(confirmObj.id, user.id);
-          onDelete(confirmObj.id);
-        } catch (e) { window.customAlert(e.message); }
+          if (confirmObj.type === 'goal') {
+            await api.data.deleteGoal(confirmObj.id, user.id);
+            onDeleteGoal(confirmObj.id);
+          } else {
+            await api.data.deleteMilestone(confirmObj.id, user.id);
+            onDeleteMilestone(confirmObj.id);
+          }
+        } catch (e) {}
       };
 
       return (
         <div className="space-y-6">
-          <form onSubmit={handleAdd} className="flex gap-2">
+          <form onSubmit={handleAddGoal} className="flex gap-2">
             <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="새로운 목표를 입력하세요" className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition" />
-            <button type="submit" disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition whitespace-nowrap shadow-md">추가</button>
+            <button type="submit" disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition whitespace-nowrap shadow-md disabled:opacity-50">추가</button>
           </form>
-          <div className="grid gap-3">
-            {goals.map(goal => (
-              <div key={goal.id} className={`flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm transition ${goal.is_completed ? 'opacity-60' : ''}`}>
-                <button onClick={() => toggleComplete(goal)} className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${goal.is_completed ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 hover:border-blue-400'}`}>
-                  {goal.is_completed && <Icon name="Check" size={14} />}
-                </button>
-                <div className={`flex-1 font-semibold ${goal.is_completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>{goal.title}</div>
-                <button onClick={() => setConfirmObj({ isOpen: true, id: goal.id })} className="text-slate-400 hover:text-red-500 p-2 rounded-lg transition"><Icon name="Trash2" size={18} /></button>
-              </div>
-            ))}
+          
+          <div className="grid gap-4">
+            {goals.map(goal => {
+              const goalMs = milestones.filter(m => m.goal_id === goal.id);
+              return (
+                <div key={goal.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                  {/* 목표 헤더 */}
+                  <div className={`flex items-center gap-3 p-4 border-b border-slate-100 transition ${goal.is_completed ? 'bg-slate-50 opacity-70' : 'bg-white'}`}>
+                    <button onClick={() => toggleGoalComplete(goal)} className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${goal.is_completed ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 hover:border-blue-400'}`}>
+                      {goal.is_completed && <Icon name="Check" size={14} />}
+                    </button>
+                    <div className={`flex-1 font-bold text-lg ${goal.is_completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>{goal.title}</div>
+                    <button onClick={() => setConfirmObj({ isOpen: true, id: goal.id, type: 'goal' })} className="text-slate-400 hover:text-red-500 p-2 rounded-lg transition"><Icon name="Trash2" size={18} /></button>
+                  </div>
+                  
+                  {/* 마일스톤 리스트 */}
+                  <div className={`p-4 space-y-2 ${goal.is_completed ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {goalMs.map(ms => (
+                      <div key={ms.id} className={`flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl transition ${ms.is_completed ? 'opacity-60' : ''}`}>
+                         <button onClick={() => toggleMilestoneComplete(ms)} className={`shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition ${ms.is_completed ? 'bg-blue-400 border-blue-400 text-white' : 'border-slate-300 hover:border-blue-400'}`}>
+                          {ms.is_completed && <Icon name="Check" size={12} />}
+                        </button>
+                        <div className={`flex-1 text-sm font-semibold ${ms.is_completed ? 'line-through text-slate-500' : 'text-slate-700'}`}>{ms.title}</div>
+                        <button onClick={() => setConfirmObj({ isOpen: true, id: ms.id, type: 'milestone' })} className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg transition"><Icon name="Trash2" size={16} /></button>
+                      </div>
+                    ))}
+                    {/* 마일스톤 추가 입력폼 */}
+                    <form onSubmit={(e) => handleAddMilestone(e, goal.id)} className="flex items-center gap-2 pt-2">
+                      <div className="text-slate-300 shrink-0 mx-1"><Icon name="CornerDownRight" size={16} /></div>
+                      <input type="text" value={msInputs[goal.id] || ''} onChange={e => setMsInputs(prev => ({...prev, [goal.id]: e.target.value}))} placeholder="세부 마일스톤 추가..." className="flex-1 text-sm bg-transparent border-b border-slate-200 px-2 py-1 focus:outline-none focus:border-blue-500 text-slate-700 placeholder:text-slate-400" />
+                      <button type="submit" className="text-blue-600 hover:text-blue-800 font-bold text-sm px-2 py-1 rounded transition">추가</button>
+                    </form>
+                  </div>
+                </div>
+              );
+            })}
             {goals.length === 0 && <div className="text-center py-10 text-slate-400 text-sm">등록된 목표가 없습니다.</div>}
           </div>
-          <ConfirmModal isOpen={confirmObj.isOpen} title="목표 삭제" message="이 목표를 정말 삭제하시겠습니까?" onConfirm={doDelete} onClose={() => setConfirmObj({ isOpen: false, id: null })} />
+          <ConfirmModal isOpen={confirmObj.isOpen} title={confirmObj.type === 'goal' ? "목표 삭제" : "마일스톤 삭제"} message="정말 삭제하시겠습니까? 연결된 실행 계획은 유지되지만 참조를 잃게 됩니다." onConfirm={doDelete} onClose={() => setConfirmObj({ isOpen: false, id: null, type: null })} />
         </div>
       );
     };
 
-    const ExecutionView = ({ goals, onPlanSaved, user }) => {
+    const ExecutionView = ({ goals, milestones, onPlanSaved, user }) => {
       const [step, setStep] = React.useState(1);
       const [selectedGoal, setSelectedGoal] = React.useState(null);
+      const [selectedMilestone, setSelectedMilestone] = React.useState(null);
+      
       const [planTitle, setPlanTitle] = React.useState('');
       const [planTime, setPlanTime] = React.useState('');
       const [planMemo, setPlanMemo] = React.useState('');
@@ -304,74 +429,122 @@
 
       const activeGoals = goals.filter(g => !g.is_completed);
 
-      const handleSave = async () => {
+      const handleGoalSelect = (goal) => {
+        setSelectedGoal(goal);
+        const ms = milestones.filter(m => m.goal_id === goal.id && !m.is_completed);
+        if (ms.length > 0) {
+          setStep(2); // 마일스톤 선택 화면으로
+        } else {
+          setSelectedMilestone(null);
+          setStep(3); // 바로 계획 작성으로 점프
+        }
+      };
+
+      const handleSave = async (e) => {
+        e.preventDefault();
         if (!selectedGoal || !planTitle || saving) return;
         setSaving(true);
         try {
-          const newPlan = await api.data.savePlan({ title: planTitle, goal_id: selectedGoal.id, plan_time: planTime, memo: planMemo, status: 'pending' }, user.id);
+          const newPlan = await api.data.savePlan({ 
+            title: planTitle, 
+            goal_id: selectedGoal.id, 
+            milestone_id: selectedMilestone?.id || null, // 복구됨
+            plan_time: planTime, 
+            memo: planMemo, 
+            status: 'pending' 
+          }, user.id);
           onPlanSaved(newPlan);
           setSavedPlan(newPlan);
-          setStep(4); // 완료 모달
-        } catch (e) { window.customAlert(e.message); }
+          setStep(5); // 완료 모달
+        } catch (e) { }
         finally { setSaving(false); }
       };
 
-      const reset = () => { setStep(1); setSelectedGoal(null); setPlanTitle(''); setPlanTime(''); setPlanMemo(''); setSavedPlan(null); };
+      const reset = () => { setStep(1); setSelectedGoal(null); setSelectedMilestone(null); setPlanTitle(''); setPlanTime(''); setPlanMemo(''); setSavedPlan(null); };
 
       return (
         <div className="max-w-2xl mx-auto mt-4">
+          {/* Q1: 목표 선택 */}
           {step === 1 && (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-fadeIn">
               <h2 className="text-xl font-bold mb-6 text-slate-800">Q1. 어떤 목표를 위한 실행인가요?</h2>
               <div className="grid gap-3">
                 {activeGoals.map(g => (
-                  <button key={g.id} onClick={() => { setSelectedGoal(g); setStep(2); }} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition font-semibold text-slate-700">
+                  <button key={g.id} onClick={() => handleGoalSelect(g)} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition font-bold text-slate-700 shadow-sm">
                     {g.title}
                   </button>
                 ))}
-                {activeGoals.length === 0 && <div className="text-sm text-slate-500 p-4 text-center">진행 중인 목표가 없습니다.</div>}
+                {activeGoals.length === 0 && <div className="text-sm text-slate-500 p-4 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">진행 중인 목표가 없습니다. 먼저 [목표] 탭에서 등록해주세요.</div>}
               </div>
             </div>
           )}
+
+          {/* Q1-1: 마일스톤 선택 (마일스톤이 있을 때만 노출) */}
           {step === 2 && (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-fadeIn">
-              <button onClick={() => setStep(1)} className="text-sm text-blue-600 font-semibold mb-4 flex items-center gap-1"><Icon name="ArrowLeft" size={16} /> 이전</button>
-              <h2 className="text-xl font-bold mb-2 text-slate-800">Q2. 구체적으로 무엇을 하실 건가요?</h2>
-              <p className="text-sm text-slate-500 mb-6">목표: {selectedGoal.title}</p>
-              <input type="text" autoFocus value={planTitle} onChange={e => setPlanTitle(e.target.value)} placeholder="예: 3km 러닝, 영단어 50개 암기" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-lg font-semibold focus:outline-none focus:border-blue-500 mb-6" />
-              <button onClick={() => setStep(3)} disabled={!planTitle.trim()} className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md">다음</button>
+              <button onClick={() => setStep(1)} className="text-sm text-blue-600 font-semibold mb-4 flex items-center gap-1 hover:text-blue-800"><Icon name="ArrowLeft" size={16} /> 이전</button>
+              <h2 className="text-xl font-bold mb-2 text-slate-800">Q1-1. 어떤 세부 마일스톤을 위한 것인가요?</h2>
+              <p className="text-sm text-slate-500 mb-6 font-semibold bg-slate-50 p-2 rounded-lg inline-block text-blue-700">목표: {selectedGoal.title}</p>
+              <div className="grid gap-3">
+                {milestones.filter(m => m.goal_id === selectedGoal.id && !m.is_completed).map(ms => (
+                  <button key={ms.id} onClick={() => { setSelectedMilestone(ms); setStep(3); }} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition font-semibold text-slate-700">
+                    <span className="text-xs text-blue-500 mr-2">●</span> {ms.title}
+                  </button>
+                ))}
+                <div className="my-2 border-t border-slate-100"></div>
+                <button onClick={() => { setSelectedMilestone(null); setStep(3); }} className="text-left p-4 rounded-xl border border-slate-200 hover:border-slate-400 hover:bg-slate-100 transition font-semibold text-slate-500 flex items-center justify-between">
+                  해당 없음 (목표에 바로 연결) <Icon name="ChevronRight" size={16} />
+                </button>
+              </div>
             </div>
           )}
+
+          {/* Q2: 구체적 실행 내용 */}
           {step === 3 && (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-fadeIn">
-              <button onClick={() => setStep(2)} className="text-sm text-blue-600 font-semibold mb-4 flex items-center gap-1"><Icon name="ArrowLeft" size={16} /> 이전</button>
+              <button onClick={() => setStep(milestones.filter(m=>m.goal_id===selectedGoal.id&&!m.is_completed).length>0 ? 2 : 1)} className="text-sm text-blue-600 font-semibold mb-4 flex items-center gap-1 hover:text-blue-800"><Icon name="ArrowLeft" size={16} /> 이전</button>
+              <h2 className="text-xl font-bold mb-2 text-slate-800">Q2. 오늘 구체적으로 무엇을 하실 건가요?</h2>
+              <p className="text-xs text-slate-500 mb-6 bg-slate-50 p-2 rounded-lg inline-block">
+                <span className="font-bold text-blue-600">{selectedGoal.title}</span>
+                {selectedMilestone && <span className="mx-1 text-slate-400">›</span>}
+                {selectedMilestone && <span className="font-semibold text-slate-600">{selectedMilestone.title}</span>}
+              </p>
+              <input type="text" autoFocus value={planTitle} onChange={e => setPlanTitle(e.target.value)} placeholder="예: 3km 러닝, 영단어 50개 암기" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-lg font-bold focus:outline-none focus:border-blue-500 mb-6 text-slate-800 shadow-inner" onKeyDown={e => { if (e.key === 'Enter' && planTitle.trim()) setStep(4); }} />
+              <button onClick={() => setStep(4)} disabled={!planTitle.trim()} className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md">다음</button>
+            </div>
+          )}
+
+          {/* Q3: 시간 및 메모 */}
+          {step === 4 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-fadeIn">
+              <button onClick={() => setStep(3)} className="text-sm text-blue-600 font-semibold mb-4 flex items-center gap-1 hover:text-blue-800"><Icon name="ArrowLeft" size={16} /> 이전</button>
               <h2 className="text-xl font-bold mb-6 text-slate-800">Q3. 언제 하시겠어요?</h2>
-              <div className="space-y-4 mb-6">
+              <div className="space-y-5 mb-8">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">실행 예정 시간 (선택)</label>
-                  <input type="time" value={planTime} onChange={e => setPlanTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-700" />
+                  <label className="block text-sm font-bold text-slate-700 mb-2">실행 예정 시간 (선택)</label>
+                  <input type="time" value={planTime} onChange={e => setPlanTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-800 font-semibold" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">상세 메모 (선택)</label>
-                  <textarea value={planMemo} onChange={e => setPlanMemo(e.target.value)} rows="3" placeholder="장소, 준비물 등..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-sm text-slate-700 custom-scrollbar"></textarea>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">상세 메모 (선택)</label>
+                  <textarea value={planMemo} onChange={e => setPlanMemo(e.target.value)} rows="3" placeholder="장소, 준비물, 동기부여 등..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-sm text-slate-700 custom-scrollbar"></textarea>
                 </div>
               </div>
-              <button onClick={handleSave} disabled={saving} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md">
+              <button onClick={handleSave} disabled={saving} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md disabled:opacity-50">
                 {saving ? '저장 중...' : '계획 저장하기'}
               </button>
             </div>
           )}
           
-          <CustomModal isOpen={step === 4} title="저장 완료!" onClose={reset}>
+          <CustomModal isOpen={step === 5} title="저장 완료!" onClose={reset}>
             <div className="text-center py-4">
-              <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="CheckCircle" size={32} /></div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">계획이 멋지게 등록되었습니다.</h3>
-              <p className="text-sm text-slate-500 mb-8">캘린더에 연동하여 잊지 말고 실행해 보세요!</p>
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-blue-100"><Icon name="CheckCircle" size={32} /></div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">계획이 성공적으로 등록되었습니다.</h3>
+              <p className="text-sm text-slate-500 mb-8 font-medium">캘린더에 연동하여 잊지 말고 실행해 보세요!</p>
               <div className="flex gap-3">
-                <a href={generateGoogleCalendarLink(planTitle, planMemo, planTime)} target="_blank" rel="noreferrer" onClick={reset} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2">
+                <a href={generateGoogleCalendarLink(planTitle, planMemo, planTime)} target="_blank" rel="noreferrer" onClick={reset} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-md">
                   <Icon name="Calendar" size={18} /> 구글 캘린더
                 </a>
-                <button onClick={() => { window.customAlert('애플 캘린더 다운로드가 시작됩니다.'); reset(); }} className="flex-1 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition flex items-center justify-center gap-2">
+                <button onClick={() => { handleAppleCalendarSync(planTitle, planMemo, planTime); reset(); }} className="flex-1 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-md">
                   <Icon name="Calendar" size={18} /> 애플 캘린더
                 </button>
               </div>
@@ -381,7 +554,7 @@
       );
     };
 
-    const JournalView = ({ plans, goals, onUpdatePlan, onDeletePlan, user }) => {
+    const JournalView = ({ plans, goals, milestones, onUpdatePlan, user }) => {
       const [visibleCount, setVisibleCount] = React.useState(5);
       const visiblePlans = plans.slice(0, visibleCount);
 
@@ -389,25 +562,30 @@
         try {
           const updated = await api.data.savePlan({ id: plan.id, [field]: value }, user.id);
           onUpdatePlan(updated);
-        } catch (e) { window.customAlert(e.message); }
+        } catch (e) {}
       };
 
       return (
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-4 px-2">
-            <h2 className="font-bold text-slate-800">최근 실행 계획</h2>
-            <span className="text-xs text-slate-500">총 {plans.length}개</span>
+            <h2 className="font-bold text-slate-800 text-lg">최근 실행 계획</h2>
+            <span className="text-xs text-slate-500 font-semibold bg-slate-200 px-2 py-1 rounded-full">총 {plans.length}개</span>
           </div>
           {visiblePlans.map(plan => {
             const goal = goals.find(g => g.id === plan.goal_id);
+            const ms = milestones.find(m => m.id === plan.milestone_id); // 복원됨
+            
             return (
-              <div key={plan.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <div key={plan.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm transition-all hover:shadow-md">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <div className="text-xs font-bold text-blue-600 mb-1">{goal ? goal.title : '삭제된 목표'}</div>
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{goal ? goal.title : '삭제된 목표'}</span>
+                      {ms && <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 flex items-center"><Icon name="ChevronRight" size={10} className="mr-0.5 opacity-50"/> {ms.title}</span>}
+                    </div>
                     <div className="font-bold text-slate-900 text-lg">{plan.title}</div>
                   </div>
-                  <select value={plan.status || 'pending'} onChange={(e) => updateField(plan, 'status', e.target.value)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 appearance-none focus:outline-none transition ${plan.status === 'completed' ? 'border-green-500 text-green-600 bg-green-50' : plan.status === 'failed' ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-300 text-slate-600 bg-slate-50'}`}>
+                  <select value={plan.status || 'pending'} onChange={(e) => updateField(plan, 'status', e.target.value)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 appearance-none focus:outline-none transition cursor-pointer ${plan.status === 'completed' ? 'border-blue-500 text-blue-700 bg-blue-50' : plan.status === 'failed' ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-300 text-slate-600 bg-slate-50'}`}>
                     <option value="pending">진행 전</option>
                     <option value="completed">완료됨</option>
                     <option value="failed">실패/연기</option>
@@ -415,58 +593,66 @@
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-100">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">결과물 / 복기</label>
-                    <BlurTextarea value={plan.result_memo} onChange={(val) => updateField(plan, 'result_memo', val)} rows="2" placeholder="무엇을 배우고 느꼈나요?" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 custom-scrollbar" />
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block flex items-center gap-1"><Icon name="Edit3" size={10}/> 결과물 / 복기</label>
+                    <BlurTextarea value={plan.result_memo} onChange={(val) => updateField(plan, 'result_memo', val)} rows="2" placeholder="무엇을 배우고 느꼈나요?" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 custom-scrollbar text-slate-700" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">실제 투입 시간</label>
-                    <BlurInput type="text" value={plan.time_spent} onChange={(val) => updateField(plan, 'time_spent', val)} placeholder="예: 2시간 30분" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500" />
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block flex items-center gap-1"><Icon name="Clock" size={10}/> 실제 투입 시간</label>
+                    <BlurInput type="text" value={plan.time_spent} onChange={(val) => updateField(plan, 'time_spent', val)} placeholder="예: 2시간 30분" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 text-slate-700" />
                   </div>
                 </div>
               </div>
             );
           })}
-          {plans.length === 0 && <div className="text-center py-10 text-slate-400">등록된 실행 계획이 없습니다.</div>}
+          {plans.length === 0 && <div className="text-center py-10 bg-white border border-slate-200 rounded-2xl text-slate-400 text-sm shadow-sm">등록된 실행 계획이 없습니다.</div>}
           {visibleCount < plans.length && (
-            <button onClick={() => setVisibleCount(v => v + 5)} className="w-full py-4 mt-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition shadow-sm">더보기 ↓</button>
+            <button onClick={() => setVisibleCount(v => v + 5)} className="w-full py-4 mt-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition shadow-sm flex justify-center items-center gap-2">더보기 <Icon name="ChevronDown" size={16} /></button>
           )}
         </div>
       );
     };
 
-    const HabitsView = ({ habits, habitLogs, onUpdate, onDelete, onLogUpdate, user }) => {
+    const HabitsView = ({ habits, habitLogs, onUpdate, onDelete, setHabitLogs, user }) => {
       const todayNum = getKSTDate().getDay(); 
-      const [selectedDay, setSelectedDay] = React.useState(todayNum === 0 ? 6 : todayNum - 1); // UI: 월(0)~일(6) 매핑
+      const [selectedDay, setSelectedDay] = React.useState(todayNum === 0 ? 6 : todayNum - 1); 
       const [isModalOpen, setIsModalOpen] = React.useState(false);
       const [editHabit, setEditHabit] = React.useState(null);
+      const [isSaving, setIsSaving] = React.useState(false);
 
       const openModal = (habit = null) => { setEditHabit(habit); setIsModalOpen(true); };
-      
       const filteredHabits = habits.filter(h => h.repeat_days && h.repeat_days.includes(selectedDay));
-
       const todayStr = getKSTYYYYMMDD(new Date());
 
       const toggleCheck = async (habit) => {
+        if (isSaving) return; setIsSaving(true);
         const isCompleted = habitLogs.some(log => log.habit_id === habit.id && log.completed_date === todayStr);
-        // 낙관적 업데이트 생략 (정확성을 위해 API 호출 후 re-fetch)
+        const nextState = !isCompleted;
+        const backupLogs = [...habitLogs];
+        
+        // Optimistic Update
+        if (nextState) setHabitLogs([...backupLogs, { habit_id: habit.id, user_id: user.id, completed_date: todayStr, is_completed: true }]);
+        else setHabitLogs(backupLogs.filter(log => !(log.habit_id === habit.id && log.completed_date === todayStr)));
+
         try {
-          await api.data.toggleHabitLog(habit.id, user.id, todayStr, !isCompleted);
-          onLogUpdate(); 
-        } catch(e) { window.customAlert('체크 에러: '+e.message); }
+          if (nextState) await supabase.from('habit_logs').upsert({ habit_id: habit.id, user_id: user.id, completed_date: todayStr, is_completed: true });
+          else await supabase.from('habit_logs').delete().eq('habit_id', habit.id).eq('completed_date', todayStr);
+        } catch(e) { 
+          setHabitLogs(backupLogs); window.customAlert('체크 처리 에러: '+e.message); 
+        } finally { setIsSaving(false); }
       };
 
       const doSaveHabit = async (data) => {
         try {
           const res = await api.data.saveHabit(data, user.id);
           onUpdate(res); setIsModalOpen(false);
-        } catch(e) { window.customAlert(e.message); }
+        } catch(e) {}
       };
       
       const doDeleteHabit = async (id) => {
         try {
           await api.data.deleteHabit(id, user.id);
           onDelete(id); setIsModalOpen(false);
-        } catch(e) { window.customAlert(e.message); }
+        } catch(e) {}
       };
 
       const renderDots = (habit) => {
@@ -475,11 +661,9 @@
         let currentDate = getKSTDate();
         let occurrencesFound = 0;
 
-        // 과거 7번의 반복 요일을 역추적하여 완료 여부 확인
-        while(occurrencesFound < 7 && dots.length < 30) { // 무한루프 방지
+        while(occurrencesFound < 7 && dots.length < 30) {
           let dayJs = currentDate.getDay();
           let dayUi = dayJs === 0 ? 6 : dayJs - 1; 
-          
           if(habit.repeat_days.includes(dayUi)) {
             const dateStr = getKSTYYYYMMDD(currentDate);
             const isDone = habitLogs.some(log => log.habit_id === habit.id && log.completed_date === dateStr);
@@ -489,13 +673,12 @@
           }
           currentDate.setDate(currentDate.getDate() - 1);
         }
-
         return (
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            <span className="text-[10px] font-bold text-slate-400">7회 중 <span className="text-blue-600">{completedCount}</span>회</span>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <span className="text-[10px] font-bold text-slate-400">7회 중 <span className="text-blue-600 font-black">{completedCount}</span>회</span>
             <div className="flex gap-1">
               {dots.map((done, i) => (
-                <div key={i} className={`w-2 h-2 rounded-full ${done ? 'bg-blue-500' : 'bg-slate-200'}`} />
+                <div key={i} className={`w-2 h-2 rounded-full ${done ? 'bg-blue-500 shadow-sm' : 'bg-slate-200 inset-shadow-sm'}`} />
               ))}
             </div>
           </div>
@@ -504,9 +687,9 @@
 
       return (
         <div>
-          <div className="flex bg-white rounded-xl p-1 shadow-sm mb-6 border border-slate-200">
+          <div className="flex bg-white rounded-xl p-1.5 shadow-sm mb-6 border border-slate-200">
             {['월', '화', '수', '목', '금', '토', '일'].map((day, idx) => (
-              <button key={idx} onClick={() => setSelectedDay(idx)} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${selectedDay === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <button key={idx} onClick={() => setSelectedDay(idx)} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${selectedDay === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}>
                 {day}
               </button>
             ))}
@@ -516,23 +699,22 @@
             {filteredHabits.map(habit => {
               const isTodayCompleted = habitLogs.some(log => log.habit_id === habit.id && log.completed_date === todayStr);
               return (
-                <div key={habit.id} className={`flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm transition ${isTodayCompleted ? 'opacity-60 bg-slate-50' : ''}`}>
-                  <button onClick={() => toggleCheck(habit)} className={`shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition ${isTodayCompleted ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 hover:border-blue-400'}`}>
+                <div key={habit.id} className={`flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm transition-all ${isTodayCompleted ? 'opacity-60 bg-slate-50' : 'hover:shadow-md'}`}>
+                  <button onClick={() => toggleCheck(habit)} disabled={isSaving} className={`shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition disabled:opacity-50 ${isTodayCompleted ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 hover:border-blue-400 bg-white'}`}>
                     {isTodayCompleted && <Icon name="Check" size={16} />}
                   </button>
                   <div className="flex-1 flex flex-col justify-center cursor-pointer" onClick={() => openModal(habit)}>
-                    <div className={`font-bold ${isTodayCompleted ? 'line-through text-slate-500' : 'text-slate-900'}`}>{habit.title}</div>
-                    {habit.exec_time && <div className="text-xs text-blue-600 font-semibold mt-0.5"><Icon name="Clock" size={12} className="mr-0.5 mb-0.5 inline" />{habit.exec_time.slice(0,5)}</div>}
+                    <div className={`font-bold text-base ${isTodayCompleted ? 'line-through text-slate-500' : 'text-slate-900'}`}>{habit.title}</div>
+                    {habit.exec_time && <div className="text-xs text-blue-600 font-semibold mt-0.5 flex items-center gap-0.5"><Icon name="Clock" size={10} />{habit.exec_time.slice(0,5)}</div>}
                   </div>
                   {renderDots(habit)}
                 </div>
               );
             })}
-            <button onClick={() => openModal()} className="w-full py-4 border-2 border-dashed border-slate-300 text-slate-500 font-bold rounded-xl hover:border-blue-500 hover:text-blue-600 transition bg-slate-50 flex justify-center items-center gap-2">
+            <button onClick={() => openModal()} className="w-full py-4 border-2 border-dashed border-slate-300 text-blue-600 font-bold rounded-xl hover:border-blue-500 hover:bg-blue-50 transition bg-white flex justify-center items-center gap-2 shadow-sm">
               <Icon name="Plus" size={20} /> 새 습관 추가
             </button>
           </div>
-
           <CustomModal isOpen={isModalOpen} title={editHabit ? "습관 수정" : "새 습관"} onClose={() => setIsModalOpen(false)}>
             <HabitForm habit={editHabit} onSave={doSaveHabit} onDelete={doDeleteHabit} />
           </CustomModal>
@@ -544,31 +726,39 @@
       const [title, setTitle] = React.useState(habit?.title || '');
       const [time, setTime] = React.useState(habit?.exec_time?.slice(0,5) || '');
       const [days, setDays] = React.useState(habit?.repeat_days || [0,1,2,3,4,5,6]);
+      const [saving, setSaving] = React.useState(false);
       
       const toggleDay = (d) => setDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort());
-      const handleSubmit = (e) => { e.preventDefault(); onSave({ id: habit?.id, title, time, repeatDays: days }); };
+      const handleSubmit = async (e) => { 
+        e.preventDefault(); if(saving) return; setSaving(true);
+        const repeat_days = days.map(Number).filter(n => !isNaN(n)).sort();
+        await onSave({ id: habit?.id, title, exec_time: time, repeat_days }); 
+        setSaving(false);
+      };
 
       return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">습관명</label>
-            <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-900" />
+            <label className="block text-xs font-bold text-slate-600 mb-1.5 ml-1">습관명</label>
+            <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-900 font-semibold shadow-inner" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">시간 (선택)</label>
-            <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-900" />
+            <label className="block text-xs font-bold text-slate-600 mb-1.5 ml-1">시간 (선택)</label>
+            <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-900 font-semibold" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-2">반복 요일</label>
+            <label className="block text-xs font-bold text-slate-600 mb-2 ml-1">반복 요일</label>
             <div className="flex gap-1">
               {['월', '화', '수', '목', '금', '토', '일'].map((d, i) => (
-                <button type="button" key={i} onClick={() => toggleDay(i)} className={`flex-1 py-2 text-sm font-bold rounded-lg border-2 transition ${days.includes(i) ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 text-slate-400 hover:border-blue-300'}`}>{d}</button>
+                <button type="button" key={i} onClick={() => toggleDay(i)} className={`flex-1 py-2 text-sm font-bold rounded-lg border-2 transition ${days.includes(i) ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'border-slate-200 text-slate-400 bg-slate-50 hover:border-blue-300'}`}>{d}</button>
               ))}
             </div>
           </div>
           <div className="pt-4 flex gap-2">
-            {habit && <button type="button" onClick={() => onDelete(habit.id)} className="px-4 py-3 bg-red-50 text-red-500 font-bold rounded-xl hover:bg-red-100 transition"><Icon name="Trash2" size={18} /></button>}
-            <button type="submit" disabled={!title || days.length===0} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition shadow-md">저장하기</button>
+            {habit && <button type="button" onClick={() => onDelete(habit.id)} className="px-4 py-3 bg-red-50 text-red-500 font-bold rounded-xl hover:bg-red-100 transition shadow-sm"><Icon name="Trash2" size={18} /></button>}
+            <button type="submit" disabled={!title || days.length===0 || saving} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition shadow-md">
+              {saving ? '저장 중...' : '저장하기'}
+            </button>
           </div>
         </form>
       );
@@ -583,21 +773,24 @@
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center">
-              <div className="text-slate-400 mb-2"><Icon name="Target" size={24} /></div>
+              <div className="text-slate-400 mb-2 bg-slate-50 p-3 rounded-full"><Icon name="Target" size={24} /></div>
               <div className="text-3xl font-black text-slate-900 mb-1">{activeGoals}</div>
               <div className="text-xs font-bold text-slate-500">진행 중 목표</div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center">
-              <div className="text-blue-500 mb-2"><Icon name="Award" size={24} /></div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center border-b-4 border-b-blue-500">
+              <div className="text-blue-600 mb-2 bg-blue-50 p-3 rounded-full"><Icon name="Award" size={24} /></div>
               <div className="text-3xl font-black text-blue-600 mb-1">{completedGoals}</div>
               <div className="text-xs font-bold text-slate-500">달성한 목표</div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 shadow-lg text-white">
-            <div className="flex items-center gap-2 mb-4 text-blue-400"><Icon name="Zap" size={20} /> <span className="font-bold">실행력 배터리</span></div>
-            <div className="flex items-end gap-2">
-              <span className="text-5xl font-black">{completedPlans}</span>
-              <span className="text-slate-400 font-semibold mb-1">개의 계획을 완료했습니다!</span>
+          <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-6 shadow-lg text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-20"><Icon name="Zap" size={64} /></div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-4 text-blue-100"><Icon name="Zap" size={20} /> <span className="font-bold">실행력 배터리</span></div>
+              <div className="flex items-end gap-2">
+                <span className="text-5xl font-black">{completedPlans}</span>
+                <span className="text-blue-200 font-semibold mb-1">개의 계획을 완료했습니다!</span>
+              </div>
             </div>
           </div>
         </div>
@@ -610,26 +803,29 @@
       const [isLoading, setIsLoading] = React.useState(true);
       
       const [goals, setGoals] = React.useState([]);
+      const [milestones, setMilestones] = React.useState([]); // 마일스톤 상태 추가
       const [plans, setPlans] = React.useState([]);
       const [habits, setHabits] = React.useState([]);
       const [habitLogs, setHabitLogs] = React.useState([]);
 
       const loadData = async (uid) => {
         try {
-          const [g, p, h, hl] = await Promise.all([
-            api.data.getGoals(uid), api.data.getPlans(uid), api.data.getHabits(uid), api.data.getHabitLogs(uid)
+          const [g, m, p, h, hl] = await Promise.all([
+            api.data.getGoals(uid), api.data.getMilestones(uid), api.data.getPlans(uid), api.data.getHabits(uid), api.data.getHabitLogs(uid)
           ]);
-          setGoals(g); setPlans(p); setHabits(h); setHabitLogs(hl);
-        } catch (e) { console.error(e); }
+          setGoals(g); setMilestones(m); setPlans(p); setHabits(h); setHabitLogs(hl);
+        } catch (e) { 
+          // 에러는 api 내 customAlert에서 처리됨
+        }
       };
 
       React.useEffect(() => {
         let mounted = true;
         const init = async () => {
-          const { data } = await supabase.auth.getSession();
-          if (data?.session?.user && mounted) {
-            setUser(data.session.user);
-            await loadData(data.session.user.id);
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user && mounted) {
+            setUser(session.user);
+            await loadData(session.user.id);
           }
           if (mounted) setIsLoading(false);
         };
@@ -639,7 +835,7 @@
           if (event === 'SIGNED_IN' && session?.user && mounted) {
             setUser(session.user); await loadData(session.user.id);
           } else if (event === 'SIGNED_OUT' && mounted) {
-            setUser(null); setGoals([]); setPlans([]); setHabits([]); setHabitLogs([]);
+            setUser(null); setGoals([]); setMilestones([]); setPlans([]); setHabits([]); setHabitLogs([]);
           }
         });
         return () => { mounted = false; listener?.subscription.unsubscribe(); };
@@ -648,7 +844,8 @@
       if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Icon name="Loader2" size={32} className="animate-spin text-blue-600" /></div>;
       if (!user) return <AuthView onLoginSuccess={(u) => { setUser(u); loadData(u.id); }} />;
 
-      const tabs = [
+      // 5개 메인 탭 일렬 배치 (화이트+블루 최적화)
+      const mainTabs = [
         { id: 'goals', label: '목표', icon: 'Target' },
         { id: 'execution', label: '계획', icon: 'Edit3' },
         { id: 'journal', label: '실행', icon: 'CheckSquare' },
@@ -657,32 +854,46 @@
       ];
 
       return (
-        <div className="min-h-screen flex flex-col">
-          <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
-            <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-16">
-              <div className="flex items-center gap-2 shrink-0 pr-4">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black shadow-sm">최</div>
-                <span className="font-bold text-slate-900 text-sm hidden sm:inline">최강 목표</span>
+        <div className="min-h-screen flex flex-col font-sans text-slate-800 bg-slate-50">
+          <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+            <div className="max-w-2xl mx-auto px-4 flex flex-col sm:flex-row sm:items-center justify-between h-auto sm:h-16 py-3 sm:py-0 gap-3 sm:gap-0">
+              <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black shadow-md shadow-blue-600/30">최</div>
+                  <span className="font-black text-slate-900 text-lg tracking-tight">최강 목표</span>
+                </div>
+                <button onClick={api.auth.signOut} className="sm:hidden text-slate-400 hover:text-red-500 p-2 rounded-lg transition bg-slate-100" title="로그아웃"><Icon name="LogOut" size={18} /></button>
               </div>
-              <div className="flex items-center flex-1 justify-end gap-1 overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
-                <nav className="flex space-x-1">
-                  {tabs.map(tab => (
-                    <button key={tab.id} onClick={() => setCurrentTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all ${currentTab === tab.id ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
-                      <Icon name={tab.icon} size={15} /> <span className="hidden xs:inline">{tab.label}</span>
+              
+              <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar pb-1 sm:pb-0 w-full sm:w-auto justify-start sm:justify-end">
+                <nav className="flex space-x-1 shrink-0">
+                  {mainTabs.map(tab => (
+                    <button key={tab.id} onClick={() => setCurrentTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${currentTab === tab.id ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
+                      <Icon name={tab.icon} size={15} /> <span>{tab.label}</span>
                     </button>
                   ))}
                 </nav>
-                <div className="w-px h-6 bg-slate-200 mx-2 shrink-0"></div>
-                <button onClick={api.auth.signOut} className="text-slate-400 hover:text-red-500 p-2 rounded-lg shrink-0 transition" title="로그아웃"><Icon name="LogOut" size={18} /></button>
+                <div className="hidden sm:block w-px h-6 bg-slate-200 mx-2 shrink-0"></div>
+                <button onClick={api.auth.signOut} className="hidden sm:block text-slate-400 hover:text-red-500 p-2 rounded-lg shrink-0 transition" title="로그아웃"><Icon name="LogOut" size={18} /></button>
               </div>
             </div>
           </header>
 
           <main className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 pb-20">
-            {currentTab === 'goals' && <GoalsView goals={goals} onUpdate={g => setGoals(prev => prev.some(x=>x.id===g.id) ? prev.map(x=>x.id===g.id?g:x) : [...prev,g])} onDelete={id => setGoals(prev => prev.filter(x=>x.id!==id))} user={user} />}
-            {currentTab === 'execution' && <ExecutionView goals={goals} onPlanSaved={p => setPlans(prev => [p, ...prev])} user={user} />}
-            {currentTab === 'journal' && <JournalView plans={plans} goals={goals} onUpdatePlan={p => setPlans(prev => prev.map(x=>x.id===p.id?p:x))} user={user} />}
-            {currentTab === 'habits' && <HabitsView habits={habits} habitLogs={habitLogs} onUpdate={h => setHabits(prev => prev.some(x=>x.id===h.id) ? prev.map(x=>x.id===h.id?h:x) : [...prev,h])} onDelete={id => setHabits(prev => prev.filter(x=>x.id!==id))} onLogUpdate={() => api.data.getHabitLogs(user.id).then(setHabitLogs)} user={user} />}
+            {currentTab === 'goals' && (
+              <GoalsView 
+                goals={goals} 
+                milestones={milestones}
+                onUpdateGoal={g => setGoals(prev => prev.some(x=>x.id===g.id) ? prev.map(x=>x.id===g.id?g:x) : [...prev,g])} 
+                onDeleteGoal={id => setGoals(prev => prev.filter(x=>x.id!==id))} 
+                onUpdateMilestone={m => setMilestones(prev => prev.some(x=>x.id===m.id) ? prev.map(x=>x.id===m.id?m:x) : [...prev,m])} 
+                onDeleteMilestone={id => setMilestones(prev => prev.filter(x=>x.id!==id))} 
+                user={user} 
+              />
+            )}
+            {currentTab === 'execution' && <ExecutionView goals={goals} milestones={milestones} onPlanSaved={p => setPlans(prev => [p, ...prev])} user={user} />}
+            {currentTab === 'journal' && <JournalView plans={plans} goals={goals} milestones={milestones} onUpdatePlan={p => setPlans(prev => prev.map(x=>x.id===p.id?p:x))} user={user} />}
+            {currentTab === 'habits' && <HabitsView habits={habits} habitLogs={habitLogs} setHabitLogs={setHabitLogs} onUpdate={h => setHabits(prev => prev.some(x=>x.id===h.id) ? prev.map(x=>x.id===h.id?h:x) : [...prev,h])} onDelete={id => setHabits(prev => prev.filter(x=>x.id!==id))} user={user} />}
             {currentTab === 'stats' && <StatsView goals={goals} plans={plans} habits={habits} />}
           </main>
         </div>
