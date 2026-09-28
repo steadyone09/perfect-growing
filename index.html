@@ -457,7 +457,7 @@
       
       const [planTitle, setPlanTitle] = React.useState('');
       const [planTime, setPlanTime] = React.useState('');
-      const [planTargetTime, setPlanTargetTime] = React.useState(''); // New: 예상 소요 시간(분)
+      const [planTargetTime, setPlanTargetTime] = React.useState(''); 
       const [planMemo, setPlanMemo] = React.useState('');
       const [planObstacle, setPlanObstacle] = React.useState('');
       const [saving, setSaving] = React.useState(false);
@@ -619,8 +619,10 @@
             <h2 className="font-black text-slate-900 text-xl tracking-tight">최근 실행 내역</h2>
             <span className="text-xs text-blue-700 font-black bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">총 {plans.length}개</span>
           </div>
+          
           {visiblePlans.map(plan => {
-            const goal = goals.find(g => g.id === goal_id);
+            // FIX: ReferenceError (goal_id is not defined) 방지 및 안전한 조회
+            const goal = goals.find(g => g.id === plan.goal_id);
             const ms = milestones.find(m => m.id === plan.milestone_id);
             
             return (
@@ -643,12 +645,13 @@
                   </div>
                 </div>
 
+                {/* Null/Undefined check for display elements */}
                 {(plan.plan_time || plan.target_time || plan.memo || plan.obstacle) && (
                   <div className="bg-slate-50 p-4 rounded-xl mb-4 text-sm border border-slate-100 shadow-inner">
                     {(plan.plan_time || plan.target_time) && (
                         <p className="text-blue-700 font-bold mb-2 flex items-center gap-1.5">
                             <Icon name="Clock" size={14}/> 
-                            {plan.plan_time ? plan.plan_time.slice(0,5) : '시간 미정'} 
+                            {plan.plan_time ? String(plan.plan_time).slice(0,5) : '시간 미정'} 
                             {plan.target_time ? <span className="text-xs bg-white text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm ml-1">예상 {plan.target_time}분</span> : ''}
                         </p>
                     )}
@@ -660,7 +663,7 @@
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase mb-1.5 flex items-center gap-1"><Icon name="Edit3" size={10}/> 결과물 / 복기</label>
-                    <BlurTextarea value={plan.result_memo} onChange={(val) => updateField(plan, 'result_memo', val)} rows="2" placeholder="무엇을 배우고 느꼈나요?" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 custom-scrollbar text-slate-700 font-medium transition placeholder:text-slate-300" />
+                    <BlurTextarea value={plan.result_memo || ''} onChange={(val) => updateField(plan, 'result_memo', val)} rows="2" placeholder="무엇을 배우고 느꼈나요?" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 custom-scrollbar text-slate-700 font-medium transition placeholder:text-slate-300" />
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase mb-1.5 flex items-center gap-1"><Icon name="Clock" size={10}/> 실제 투입 시간</label>
@@ -670,10 +673,22 @@
               </div>
             );
           })}
-          {plans.length === 0 && <div className="text-center py-12 bg-white border border-slate-200 rounded-2xl text-slate-400 text-sm shadow-sm flex flex-col items-center"><Icon name="Edit3" size={32} className="mb-3 text-slate-300"/>실행 내역이 없습니다.</div>}
+          
+          {/* Empty State UI */}
+          {plans.length === 0 && (
+              <div className="text-center py-12 bg-white border border-slate-200 rounded-2xl text-slate-500 text-sm shadow-sm flex flex-col items-center">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex justify-center items-center mb-4 border border-slate-100">
+                      <Icon name="Edit3" size={28} className="text-slate-300"/>
+                  </div>
+                  <h3 className="text-lg font-black text-slate-800 mb-1">아직 등록된 실행 계획이 없습니다.</h3>
+                  <p className="font-medium text-slate-400">[계획] 탭에서 새로운 행동을 설계해 보세요!</p>
+              </div>
+          )}
+          
           {visibleCount < plans.length && (
             <button onClick={() => setVisibleCount(v => v + 5)} className="w-full py-4 mt-2 bg-white border border-slate-200 text-blue-600 font-bold rounded-xl hover:bg-slate-50 transition shadow-sm flex justify-center items-center gap-2">더보기 <Icon name="ChevronDown" size={16} /></button>
           )}
+          
           <ConfirmModal isOpen={confirmDel.isOpen} title="계획 삭제" message="이 실행 계획을 완전히 삭제하시겠습니까?" onConfirm={executeDelete} onClose={() => setConfirmDel({ isOpen: false, id: null })} />
         </div>
       );
@@ -805,7 +820,6 @@
 
       return (
         <div className="space-y-6">
-          {/* Top Summary */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center text-center">
               <div className="text-slate-400 mb-3 bg-slate-50 p-3 rounded-full border border-slate-100"><Icon name="Target" size={24} /></div>
@@ -819,7 +833,6 @@
             </div>
           </div>
 
-          {/* Goal Detailed Stats */}
           <h3 className="font-black text-slate-900 text-lg tracking-tight px-2 mt-4">목표별 상세 현황</h3>
           <div className="grid gap-4">
               {goals.map(goal => {
@@ -839,7 +852,6 @@
                           </div>
                           
                           <div className="space-y-4">
-                              {/* Plan completion bar */}
                               <div>
                                   <div className="flex justify-between text-xs font-bold mb-1.5">
                                       <span className="text-slate-500">실행 계획 달성률</span>
@@ -850,7 +862,6 @@
                                   </div>
                               </div>
                               
-                              {/* Time tracking */}
                               <div className="grid grid-cols-2 gap-3 pt-2">
                                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                       <div className="text-[10px] text-slate-400 font-bold mb-1 flex items-center gap-1"><Icon name="Clock" size={10}/> 목표 예상 시간</div>
@@ -865,7 +876,7 @@
                       </div>
                   );
               })}
-              {goals.length === 0 && <div className="text-center py-10 text-slate-400 text-sm font-medium">등록된 목표가 없어 통계를 표시할 수 없습니다.</div>}
+              {goals.length === 0 && <div className="text-center py-10 bg-white border border-slate-200 rounded-2xl text-slate-400 text-sm shadow-sm">등록된 목표가 없어 통계를 표시할 수 없습니다.</div>}
           </div>
         </div>
       );
