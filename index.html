@@ -118,8 +118,8 @@
       },
       data: {
         getGoals: async (uid) => {
-          const { data, error } = await supabase.from('goals').select('*').eq('userId', uid).order('created_at', { ascending: true });
-          if (error) { window.customAlert(`목표 조회 에러: ${error.message}`); throw error; }
+          const { data, error } = await supabase.from('goals').select('*').eq('userId', uid).order('created_at', { ascending: false });
+          if (error) { window.customAlert(`목표 조회 에러: ${error.message} / 상세: ${error.details}`); throw error; }
           return data || [];
         },
         saveGoal: async (goalData, uid) => {
@@ -159,8 +159,7 @@
           return data || [];
         },
         savePlan: async (planData, uid) => {
-          const { timeMemo, ...cleanData } = planData; 
-          const payload = { ...cleanData, userId: uid };
+          const payload = { ...planData, userId: uid };
           const { data, error } = payload.id 
             ? await supabase.from('plans').update(payload).eq('id', payload.id).eq('userId', uid).select()
             : await supabase.from('plans').insert(payload).select();
@@ -207,7 +206,7 @@
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-800 flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-white shrink-0">
               <h3 className="text-lg font-bold text-slate-900 tracking-tight">{title}</h3>
               <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg transition"><Icon name="X" size={20} /></button>
             </div>
@@ -326,24 +325,29 @@
     const GoalsView = ({ goals, milestones, onUpdateGoal, onDeleteGoal, onUpdateMilestone, onDeleteMilestone, user }) => {
       const [title, setTitle] = React.useState('');
       const [goalTargetDate, setGoalTargetDate] = React.useState('');
+      const [goalReward, setGoalReward] = React.useState('');
       const [saving, setSaving] = React.useState(false);
       const [confirmObj, setConfirmObj] = React.useState({ isOpen: false, id: null, type: null });
 
       const [msInputs, setMsInputs] = React.useState({});
       const [msDates, setMsDates] = React.useState({});
+      const [msRewards, setMsRewards] = React.useState({});
+      const [expandedGoals, setExpandedGoals] = React.useState({});
 
       const handleAddGoal = async (e) => {
         e.preventDefault(); if (!title.trim() || saving) return;
         setSaving(true);
         try {
-          const newGoal = await api.data.saveGoal({ title, target_date: goalTargetDate || null, is_completed: false }, user.id);
-          onUpdateGoal(newGoal); setTitle(''); setGoalTargetDate('');
+          const newGoal = await api.data.saveGoal({ 
+              title, target_date: goalTargetDate || null, reward: goalReward || null, reward_granted: false, is_completed: false 
+          }, user.id);
+          onUpdateGoal(newGoal); setTitle(''); setGoalTargetDate(''); setGoalReward('');
         } catch (e) {} finally { setSaving(false); }
       };
 
-      const toggleGoalComplete = async (goal) => {
+      const toggleGoalField = async (goal, field) => {
         try {
-          const updated = await api.data.saveGoal({ id: goal.id, is_completed: !goal.is_completed }, user.id);
+          const updated = await api.data.saveGoal({ id: goal.id, [field]: !goal[field] }, user.id);
           onUpdateGoal(updated);
         } catch (e) {}
       };
@@ -352,18 +356,23 @@
         e.preventDefault();
         const msTitle = msInputs[goalId];
         const msDate = msDates[goalId];
+        const msReward = msRewards[goalId];
         if (!msTitle?.trim()) return;
         try {
-          const newMs = await api.data.saveMilestone({ title: msTitle, target_date: msDate || null, goal_id: goalId, is_completed: false }, user.id);
+          const newMs = await api.data.saveMilestone({ 
+              title: msTitle, target_date: msDate || null, reward: msReward || null, reward_granted: false, goal_id: goalId, is_completed: false 
+          }, user.id);
           onUpdateMilestone(newMs);
           setMsInputs(prev => ({ ...prev, [goalId]: '' }));
           setMsDates(prev => ({ ...prev, [goalId]: '' }));
+          setMsRewards(prev => ({ ...prev, [goalId]: '' }));
+          setExpandedGoals(prev => ({ ...prev, [goalId]: true }));
         } catch (e) {}
       };
 
-      const toggleMilestoneComplete = async (ms) => {
+      const toggleMilestoneField = async (ms, field) => {
         try {
-          const updated = await api.data.saveMilestone({ id: ms.id, is_completed: !ms.is_completed }, user.id);
+          const updated = await api.data.saveMilestone({ id: ms.id, [field]: !ms[field] }, user.id);
           onUpdateMilestone(updated);
         } catch (e) {}
       };
@@ -378,68 +387,105 @@
         } catch (e) {}
       };
 
+      const toggleExpand = (id) => {
+          setExpandedGoals(prev => ({ ...prev, [id]: !prev[id] }));
+      };
+
       return (
         <div className="space-y-6">
-          <form onSubmit={handleAddGoal} className="flex flex-col sm:flex-row gap-2">
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="새로운 목표를 입력하세요" className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 shadow-sm transition text-slate-800 font-medium" />
-            <div className="flex gap-2">
-              <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-3 focus:outline-none focus:border-blue-500 shadow-sm text-sm text-slate-600 transition" />
-              <button type="submit" disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm disabled:opacity-50 transition whitespace-nowrap">추가</button>
+          <form onSubmit={handleAddGoal} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <h3 className="font-bold text-slate-700 text-sm mb-1">새로운 목표 설정</h3>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="목표를 입력하세요 (예: 한 달 3kg 감량)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition text-slate-800 font-medium" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 focus:outline-none focus:border-blue-500 text-sm text-slate-600 transition" />
+                <input type="text" value={goalReward} onChange={e => setGoalReward(e.target.value)} placeholder="목표 달성 시 보상 (선택)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 focus:outline-none focus:border-blue-500 text-sm text-slate-600 transition" />
             </div>
+            <button type="submit" disabled={saving || !title.trim()} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm disabled:opacity-50 transition">추가하기</button>
           </form>
           
           <div className="grid gap-4">
             {goals.map(goal => {
               const goalMs = milestones.filter(m => m.goal_id === goal.id);
+              const isExpanded = !!expandedGoals[goal.id];
               return (
                 <div key={goal.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                  <div className={`flex items-start sm:items-center gap-3 p-5 border-b border-slate-100 transition ${goal.is_completed ? 'bg-slate-50 opacity-70' : 'bg-white'}`}>
-                    <button onClick={() => toggleGoalComplete(goal)} className={`shrink-0 mt-0.5 sm:mt-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${goal.is_completed ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 hover:border-blue-400'}`}>
-                      {goal.is_completed && <Icon name="Check" size={14} />}
-                    </button>
-                    <div className="flex-1">
-                      <div className={`font-black text-lg tracking-tight ${goal.is_completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>{goal.title}</div>
-                      {goal.target_date && (() => {
-                          const dday = getDDay(goal.target_date);
-                          return (
-                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                <span className="text-xs text-slate-500 font-semibold flex items-center gap-1"><Icon name="Calendar" size={12}/> 기한: {goal.target_date}</span>
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${dday.color}`}>{dday.text}</span>
-                            </div>
-                          );
-                      })()}
+                  <div className={`flex flex-col p-5 border-b border-slate-100 transition ${goal.is_completed ? 'bg-slate-50 opacity-70' : 'bg-white'}`}>
+                    <div className="flex items-start sm:items-center gap-3 w-full">
+                        <button onClick={() => toggleGoalField(goal, 'is_completed')} className={`shrink-0 mt-0.5 sm:mt-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${goal.is_completed ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 hover:border-blue-400 bg-white'}`}>
+                        {goal.is_completed && <Icon name="Check" size={14} />}
+                        </button>
+                        <div className="flex-1">
+                            <div className={`font-black text-lg tracking-tight ${goal.is_completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>{goal.title}</div>
+                            {goal.target_date && (() => {
+                                const dday = getDDay(goal.target_date);
+                                return (
+                                <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                    <span className="text-xs text-slate-500 font-semibold flex items-center gap-1"><Icon name="Calendar" size={12}/> {goal.target_date}</span>
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${dday.color}`}>{dday.text}</span>
+                                </div>
+                                );
+                            })()}
+                            {goal.reward && (
+                                <div className="flex items-center gap-2 mt-2 bg-blue-50 p-2 rounded-xl border border-blue-100 justify-between">
+                                    <span className="text-sm font-bold text-blue-700 flex items-center gap-1.5"><Icon name="Gift" size={16}/> {goal.reward}</span>
+                                    <button onClick={() => toggleGoalField(goal, 'reward_granted')} className={`shrink-0 px-2 py-1 text-xs rounded-lg font-bold border transition ${goal.reward_granted ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-100'}`}>
+                                        {goal.reward_granted ? '보상 받음' : '보상 체크'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex flex-col items-center gap-1 shrink-0">
+                            <button onClick={() => setConfirmObj({ isOpen: true, id: goal.id, type: 'goal' })} className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg transition"><Icon name="Trash2" size={18} /></button>
+                            <button onClick={() => toggleExpand(goal.id)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded-lg transition bg-slate-50">
+                                <Icon name={isExpanded ? "ChevronUp" : "ChevronDown"} size={18} />
+                            </button>
+                        </div>
                     </div>
-                    <button onClick={() => setConfirmObj({ isOpen: true, id: goal.id, type: 'goal' })} className="text-slate-300 hover:text-red-500 p-2 rounded-lg transition"><Icon name="Trash2" size={18} /></button>
                   </div>
                   
-                  <div className={`p-4 sm:p-5 space-y-2 ${goal.is_completed ? 'opacity-50 pointer-events-none' : ''}`}>
-                    {goalMs.map(ms => {
-                        const msDDay = getDDay(ms.target_date);
-                        return (
-                          <div key={ms.id} className={`flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl transition ${ms.is_completed ? 'opacity-60' : ''}`}>
-                            <button onClick={() => toggleMilestoneComplete(ms)} className={`shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition ${ms.is_completed ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 hover:border-blue-400'}`}>
-                              {ms.is_completed && <Icon name="Check" size={12} />}
-                            </button>
-                            <div className="flex-1 flex flex-col justify-center">
-                              <span className={`text-sm font-bold ${ms.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{ms.title}</span>
-                              {ms.target_date && (
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[10px] text-slate-400 font-semibold flex items-center"><Icon name="Calendar" size={10} className="mr-0.5"/>{ms.target_date}</span>
-                                    {msDDay && <span className={`text-[9px] font-black px-1.5 py-0 rounded ${msDDay.color.replace('border', 'border-0')}`}>{msDDay.text}</span>}
+                  {isExpanded && (
+                    <div className={`p-4 sm:p-5 space-y-3 bg-slate-50/50 ${goal.is_completed ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className="text-xs font-bold text-slate-400 flex items-center gap-1 mb-1"><Icon name="List" size={14}/> 세부 중간 목표</div>
+                        {goalMs.map(ms => {
+                            const msDDay = getDDay(ms.target_date);
+                            return (
+                            <div key={ms.id} className={`flex flex-col p-3 bg-white border border-slate-200 rounded-xl transition shadow-sm ${ms.is_completed ? 'opacity-60 bg-slate-50' : ''}`}>
+                                <div className="flex items-start gap-3">
+                                    <button onClick={() => toggleMilestoneField(ms, 'is_completed')} className={`shrink-0 mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition ${ms.is_completed ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 hover:border-blue-400 bg-white'}`}>
+                                    {ms.is_completed && <Icon name="Check" size={12} />}
+                                    </button>
+                                    <div className="flex-1 flex flex-col justify-center">
+                                        <span className={`text-sm font-bold ${ms.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{ms.title}</span>
+                                        {ms.target_date && (
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                                <span className="text-[10px] text-slate-500 font-semibold flex items-center"><Icon name="Calendar" size={10} className="mr-0.5"/>{ms.target_date}</span>
+                                                {msDDay && <span className={`text-[9px] font-black px-1.5 py-0 rounded ${msDDay.color.replace('border', 'border-0')}`}>{msDDay.text}</span>}
+                                            </div>
+                                        )}
+                                        {ms.reward && (
+                                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+                                                <span className="text-[11px] font-bold text-blue-600 flex items-center gap-1"><Icon name="Gift" size={12}/> {ms.reward}</span>
+                                                <button onClick={() => toggleMilestoneField(ms, 'reward_granted')} className={`text-[10px] px-2 py-0.5 rounded font-bold border transition ${ms.reward_granted ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}>
+                                                    {ms.reward_granted ? '보상 받음' : '보상 체크'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={() => setConfirmObj({ isOpen: true, id: ms.id, type: 'milestone' })} className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg transition"><Icon name="Trash2" size={16} /></button>
                                 </div>
-                              )}
                             </div>
-                            <button onClick={() => setConfirmObj({ isOpen: true, id: ms.id, type: 'milestone' })} className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg transition"><Icon name="Trash2" size={16} /></button>
-                          </div>
-                        );
-                    })}
-                    <form onSubmit={(e) => handleAddMilestone(e, goal.id)} className="flex items-center gap-2 pt-2 flex-wrap">
-                      <div className="text-blue-300 shrink-0 mx-1 hidden sm:block"><Icon name="CornerDownRight" size={16} /></div>
-                      <input type="text" value={msInputs[goal.id] || ''} onChange={e => setMsInputs(prev => ({...prev, [goal.id]: e.target.value}))} placeholder="중간 목표 추가..." className="flex-1 min-w-[150px] text-sm bg-transparent border-b-2 border-slate-200 px-2 py-1.5 focus:outline-none focus:border-blue-500 text-slate-700 transition" />
-                      <input type="date" value={msDates[goal.id] || ''} onChange={e => setMsDates(prev => ({...prev, [goal.id]: e.target.value}))} className="text-xs bg-transparent border-b-2 border-slate-200 px-2 py-1.5 focus:outline-none focus:border-blue-500 text-slate-500 transition" />
-                      <button type="submit" className="text-blue-600 hover:text-blue-800 font-bold text-sm px-2 py-1 rounded transition">추가</button>
-                    </form>
-                  </div>
+                            );
+                        })}
+                        <form onSubmit={(e) => handleAddMilestone(e, goal.id)} className="flex flex-col gap-2 pt-2 border-t border-slate-200/60 mt-2">
+                            <input type="text" value={msInputs[goal.id] || ''} onChange={e => setMsInputs(prev => ({...prev, [goal.id]: e.target.value}))} placeholder="새로운 중간 목표 입력..." className="w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500 text-slate-700 transition shadow-sm" />
+                            <div className="flex gap-2">
+                                <input type="date" value={msDates[goal.id] || ''} onChange={e => setMsDates(prev => ({...prev, [goal.id]: e.target.value}))} className="w-1/2 text-xs bg-white border border-slate-200 rounded-xl px-2 py-2.5 focus:outline-none focus:border-blue-500 text-slate-600 transition shadow-sm" />
+                                <input type="text" value={msRewards[goal.id] || ''} onChange={e => setMsRewards(prev => ({...prev, [goal.id]: e.target.value}))} placeholder="보상 (선택)" className="w-1/2 text-xs bg-white border border-slate-200 rounded-xl px-2 py-2.5 focus:outline-none focus:border-blue-500 text-slate-600 transition shadow-sm" />
+                            </div>
+                            <button type="submit" disabled={!(msInputs[goal.id]?.trim())} className="w-full text-white bg-slate-800 disabled:bg-slate-300 hover:bg-slate-900 font-bold text-sm px-3 py-2.5 rounded-xl transition shadow-sm">중간 목표 추가</button>
+                        </form>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -460,6 +506,7 @@
       const [planTargetTime, setPlanTargetTime] = React.useState(''); 
       const [planMemo, setPlanMemo] = React.useState('');
       const [planObstacle, setPlanObstacle] = React.useState('');
+      const [planReward, setPlanReward] = React.useState('');
       const [saving, setSaving] = React.useState(false);
 
       const activeGoals = goals.filter(g => !g.is_completed);
@@ -484,6 +531,8 @@
             target_time: planTargetTime ? parseInt(planTargetTime, 10) : null,
             memo: planMemo, 
             obstacle: planObstacle,
+            reward: planReward || null,
+            reward_granted: false,
             status: 'pending' 
           }, user.id);
           onPlanSaved(newPlan);
@@ -491,7 +540,7 @@
         } catch (e) {} finally { setSaving(false); }
       };
 
-      const reset = () => { setStep(1); setSelectedGoal(null); setSelectedMilestone(null); setPlanTitle(''); setPlanTime(''); setPlanTargetTime(''); setPlanMemo(''); setPlanObstacle(''); };
+      const reset = () => { setStep(1); setSelectedGoal(null); setSelectedMilestone(null); setPlanTitle(''); setPlanTime(''); setPlanTargetTime(''); setPlanMemo(''); setPlanObstacle(''); setPlanReward(''); };
 
       return (
         <div className="max-w-2xl mx-auto mt-2">
@@ -500,7 +549,7 @@
               <h2 className="text-xl font-black mb-6 text-slate-800 tracking-tight">Q1. 어떤 목표를 위한 실행인가요?</h2>
               <div className="grid gap-3">
                 {activeGoals.map(g => (
-                  <button key={g.id} onClick={() => handleGoalSelect(g)} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 hover:shadow-sm transition font-bold text-slate-700 bg-slate-50">{g.title}</button>
+                  <button key={g.id} onClick={() => handleGoalSelect(g)} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 hover:shadow-sm transition font-bold text-slate-700 bg-slate-50 flex justify-between items-center">{g.title} <Icon name="ChevronRight" size={18} className="text-slate-400"/></button>
                 ))}
                 {activeGoals.length === 0 && <div className="text-sm text-slate-400 p-6 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 flex flex-col items-center"><Icon name="Target" size={24} className="mb-2"/>진행 중인 목표가 없습니다.</div>}
               </div>
@@ -514,8 +563,8 @@
               <p className="text-sm text-blue-700 mb-6 font-bold bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg inline-block">목표: {selectedGoal.title}</p>
               <div className="grid gap-3">
                 {milestones.filter(m => m.goal_id === selectedGoal.id && !m.is_completed).map(ms => (
-                  <button key={ms.id} onClick={() => { setSelectedMilestone(ms); setStep(3); }} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition font-bold text-slate-700 bg-slate-50 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div> {ms.title}
+                  <button key={ms.id} onClick={() => { setSelectedMilestone(ms); setStep(3); }} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition font-bold text-slate-700 bg-slate-50 flex items-center justify-between">
+                    <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div> {ms.title}</span> <Icon name="ChevronRight" size={18} className="text-slate-400"/>
                   </button>
                 ))}
                 <div className="my-2 border-t border-slate-100"></div>
@@ -548,16 +597,16 @@
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">실행 예정 시간 (선택)</label>
-                    <input type="time" value={planTime} onChange={e => setPlanTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-800 font-medium transition" />
+                    <input type="time" value={planTime} onChange={e => setPlanTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-800 font-medium transition shadow-sm" />
                     </div>
                     <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">예상 소요 시간 (선택, 분 단위)</label>
-                    <input type="number" min="0" value={planTargetTime} onChange={e => setPlanTargetTime(e.target.value)} placeholder="예: 30" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-800 font-medium transition placeholder:text-slate-300" />
+                    <label className="block text-sm font-bold text-slate-700 mb-2">예상 소요 시간 (분 단위, 선택)</label>
+                    <input type="number" min="0" value={planTargetTime} onChange={e => setPlanTargetTime(e.target.value)} placeholder="예: 30" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-800 font-medium transition shadow-sm placeholder:text-slate-300" />
                     </div>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">상세 메모 (선택)</label>
-                  <textarea value={planMemo} onChange={e => setPlanMemo(e.target.value)} rows="3" placeholder="장소, 준비물 등..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-sm text-slate-700 custom-scrollbar transition placeholder:text-slate-300"></textarea>
+                  <textarea value={planMemo} onChange={e => setPlanMemo(e.target.value)} rows="2" placeholder="장소, 준비물 등..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-sm text-slate-700 custom-scrollbar transition shadow-sm placeholder:text-slate-300"></textarea>
                 </div>
               </div>
               <button onClick={() => setStep(5)} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-sm">다음</button>
@@ -567,8 +616,17 @@
           {step === 5 && (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-fadeIn">
               <button onClick={() => setStep(4)} className="text-sm text-blue-600 font-bold mb-4 flex items-center gap-1 hover:text-blue-800"><Icon name="ArrowLeft" size={16} /> 이전</button>
-              <h2 className="text-xl font-black mb-6 text-slate-800 tracking-tight leading-snug">Q4. 달성에 방해가 될 만한 요소가 있다면 무엇인가요? 어떻게 극복할 것인가요?</h2>
-              <textarea value={planObstacle} onChange={e => setPlanObstacle(e.target.value)} rows="4" placeholder="예: 퇴근 후 피곤함 -> 집에 오자마자 옷부터 갈아입기" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 focus:outline-none focus:border-blue-500 mb-8 text-slate-700 custom-scrollbar transition placeholder:text-slate-300"></textarea>
+              <h2 className="text-xl font-black mb-6 text-slate-800 tracking-tight leading-snug">Q4. 달성에 방해가 될 만한 요소와 스스로에게 줄 보상은 무엇인가요?</h2>
+              <div className="space-y-5 mb-8">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">방해 요소 및 극복 방안 (선택)</label>
+                  <textarea value={planObstacle} onChange={e => setPlanObstacle(e.target.value)} rows="3" placeholder="예: 퇴근 후 피곤함 -> 집에 오자마자 운동복으로 갈아입기" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-700 custom-scrollbar transition shadow-sm placeholder:text-slate-300"></textarea>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">계획 완료 시 보상 (선택)</label>
+                  <input type="text" value={planReward} onChange={e => setPlanReward(e.target.value)} placeholder="예: 넷플릭스 1시간 보기, 맛있는 커피 한 잔" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 text-slate-800 font-medium transition shadow-sm placeholder:text-slate-300" />
+                </div>
+              </div>
               <button onClick={handleSave} disabled={saving} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition shadow-md disabled:opacity-50">
                 {saving ? '저장 중...' : '계획 저장 완료하기'}
               </button>
@@ -621,19 +679,19 @@
           </div>
           
           {visiblePlans.map(plan => {
-            // FIX: ReferenceError (goal_id is not defined) 방지 및 안전한 조회
             const goal = goals.find(g => g.id === plan.goal_id);
             const ms = milestones.find(m => m.id === plan.milestone_id);
+            const isCompleted = plan.status === 'completed';
             
             return (
-              <div key={plan.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+              <div key={plan.id} className={`bg-white border border-slate-200 rounded-2xl p-5 shadow-sm transition ${isCompleted ? 'opacity-60 bg-slate-50' : 'hover:shadow-md'}`}>
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1 pr-4">
                     <div className="flex items-center gap-1.5 flex-wrap mb-2">
-                      <span className="text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{goal ? goal.title : '삭제된 목표'}</span>
-                      {ms && <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 flex items-center"><Icon name="ChevronRight" size={10} className="mr-0.5 opacity-50"/> {ms.title}</span>}
+                      <span className={`text-[10px] font-black bg-blue-50 px-2 py-0.5 rounded border border-blue-100 ${isCompleted ? 'line-through text-blue-400' : 'text-blue-700'}`}>{goal ? goal.title : '삭제된 목표'}</span>
+                      {ms && <span className={`text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200 flex items-center ${isCompleted ? 'line-through text-slate-400' : 'text-slate-600'}`}><Icon name="ChevronRight" size={10} className="mr-0.5 opacity-50"/> {ms.title}</span>}
                     </div>
-                    <div className="font-black text-slate-900 text-lg leading-snug">{plan.title}</div>
+                    <div className={`font-black text-lg leading-snug ${isCompleted ? 'line-through text-slate-400' : 'text-slate-900'}`}>{plan.title}</div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <select value={plan.status || 'pending'} onChange={(e) => updateField(plan, 'status', e.target.value)} className={`text-xs font-black px-3 py-1.5 rounded-lg border-2 appearance-none focus:outline-none transition cursor-pointer shadow-sm ${plan.status === 'completed' ? 'border-blue-600 text-blue-700 bg-blue-50' : plan.status === 'failed' ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-300 text-slate-600 bg-slate-50 hover:bg-slate-100'}`}>
@@ -645,14 +703,13 @@
                   </div>
                 </div>
 
-                {/* Null/Undefined check for display elements */}
                 {(plan.plan_time || plan.target_time || plan.memo || plan.obstacle) && (
-                  <div className="bg-slate-50 p-4 rounded-xl mb-4 text-sm border border-slate-100 shadow-inner">
+                  <div className={`p-4 rounded-xl mb-4 text-sm border shadow-inner ${isCompleted ? 'bg-slate-100/50 border-slate-200' : 'bg-slate-50 border-slate-100'}`}>
                     {(plan.plan_time || plan.target_time) && (
-                        <p className="text-blue-700 font-bold mb-2 flex items-center gap-1.5">
+                        <p className={`font-bold mb-2 flex items-center gap-1.5 ${isCompleted ? 'text-slate-500' : 'text-blue-700'}`}>
                             <Icon name="Clock" size={14}/> 
-                            {plan.plan_time ? String(plan.plan_time).slice(0,5) : '시간 미정'} 
-                            {plan.target_time ? <span className="text-xs bg-white text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm ml-1">예상 {plan.target_time}분</span> : ''}
+                            {plan.plan_time ? String(plan.plan_time).substring(0,5) : '시간 미정'} 
+                            {plan.target_time ? <span className={`text-xs bg-white border px-1.5 py-0.5 rounded shadow-sm ml-1 ${isCompleted ? 'text-slate-500 border-slate-200' : 'text-blue-600 border-blue-100'}`}>예상 {plan.target_time}분</span> : ''}
                         </p>
                     )}
                     {plan.memo && <p className="text-slate-600 mb-2 flex items-start gap-1.5 font-medium"><Icon name="AlignLeft" size={14} className="mt-0.5 shrink-0 text-slate-400"/> {plan.memo}</p>}
@@ -660,21 +717,29 @@
                   </div>
                 )}
 
+                {plan.reward && (
+                  <div className={`mb-4 flex items-center justify-between p-3 rounded-xl border ${isCompleted ? (plan.reward_granted ? 'bg-slate-100 border-slate-200' : 'bg-blue-50/40 border-blue-100') : 'bg-blue-50 border-blue-100'}`}>
+                     <span className={`text-sm font-bold ${plan.reward_granted ? 'text-slate-500 line-through' : 'text-blue-700'}`}>🎁 보상: {plan.reward}</span>
+                     <button onClick={() => updateField(plan, 'reward_granted', !plan.reward_granted)} className={`px-3 py-1.5 text-xs rounded-lg font-bold transition shadow-sm ${plan.reward_granted ? 'bg-slate-300 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                        {plan.reward_granted ? '지급 완료' : '보상 받기'}
+                     </button>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase mb-1.5 flex items-center gap-1"><Icon name="Edit3" size={10}/> 결과물 / 복기</label>
-                    <BlurTextarea value={plan.result_memo || ''} onChange={(val) => updateField(plan, 'result_memo', val)} rows="2" placeholder="무엇을 배우고 느꼈나요?" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 custom-scrollbar text-slate-700 font-medium transition placeholder:text-slate-300" />
+                    <BlurTextarea value={plan.result_memo || ''} onChange={(val) => updateField(plan, 'result_memo', val)} rows="2" placeholder="무엇을 배우고 느꼈나요?" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 custom-scrollbar text-slate-700 font-medium transition placeholder:text-slate-300 shadow-sm" />
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase mb-1.5 flex items-center gap-1"><Icon name="Clock" size={10}/> 실제 투입 시간</label>
-                    <BlurInput type="number" min="0" value={plan.time_spent || ''} onChange={(val) => updateField(plan, 'time_spent', val)} placeholder="분 단위 (예: 45)" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 text-slate-700 font-medium transition placeholder:text-slate-300" />
+                    <BlurInput type="number" min="0" value={plan.time_spent || ''} onChange={(val) => updateField(plan, 'time_spent', val)} placeholder="분 단위 (예: 45)" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 text-slate-700 font-medium transition placeholder:text-slate-300 shadow-sm" />
                   </div>
                 </div>
               </div>
             );
           })}
           
-          {/* Empty State UI */}
           {plans.length === 0 && (
               <div className="text-center py-12 bg-white border border-slate-200 rounded-2xl text-slate-500 text-sm shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 bg-slate-50 rounded-full flex justify-center items-center mb-4 border border-slate-100">
@@ -954,7 +1019,7 @@
             </div>
           </header>
           <main className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 pb-24">
-            {currentTab === 'goals' && <GoalsView goals={goals} milestones={milestones} onUpdateGoal={g => setGoals(p => p.some(x=>x.id===g.id)?p.map(x=>x.id===g.id?g:x):[...p,g])} onDeleteGoal={id => setGoals(p => p.filter(x=>x.id!==id))} onUpdateMilestone={m => setMilestones(p => p.some(x=>x.id===m.id)?p.map(x=>x.id===m.id?m:x):[...p,m])} onDeleteMilestone={id => setMilestones(p => p.filter(x=>x.id!==id))} user={user} />}
+            {currentTab === 'goals' && <GoalsView goals={goals} milestones={milestones} onUpdateGoal={g => setGoals(p => p.some(x=>x.id===g.id)?p.map(x=>x.id===g.id?g:x):[g, ...p])} onDeleteGoal={id => setGoals(p => p.filter(x=>x.id!==id))} onUpdateMilestone={m => setMilestones(p => p.some(x=>x.id===m.id)?p.map(x=>x.id===m.id?m:x):[...p,m])} onDeleteMilestone={id => setMilestones(p => p.filter(x=>x.id!==id))} user={user} />}
             {currentTab === 'execution' && <ExecutionView goals={goals} milestones={milestones} onPlanSaved={p => setPlans([p, ...plans])} user={user} />}
             {currentTab === 'journal' && <JournalView plans={plans} goals={goals} milestones={milestones} onUpdatePlan={p => setPlans(prev => prev.map(x=>x.id===p.id?p:x))} onDeletePlan={id => setPlans(prev => prev.filter(x=>x.id!==id))} user={user} />}
             {currentTab === 'habits' && <HabitsView habits={habits} habitLogs={habitLogs} setHabitLogs={setHabitLogs} onUpdate={h => setHabits(p => p.some(x=>x.id===h.id)?p.map(x=>x.id===h.id?h:x):[...p,h])} onDelete={id => setHabits(p => p.filter(x=>x.id!==id))} user={user} />}
